@@ -32,7 +32,11 @@ public class SlideOutObject : MonoBehaviour
             StartCoroutine(SlideOut());
         }
     }
-
+    private void Start()
+    {
+        if(this !=null)
+            this.gameObject.SetActive(true);
+    }
     private IEnumerator SlideOut()
     {
         isPlaying = true;
