@@ -279,26 +279,29 @@ public class Recipe3Controller : MonoBehaviour
         // ----------------------------------------------------------------------------------
         // STEP 5: Oven ja chuka hai! Cake Pan Table par hai -> Sparkles isi par phootengi!
         // ----------------------------------------------------------------------------------
-        if (SequentialAnimatorController.Instance != null)
-        {
-            ParticleSystem[] particles = SequentialAnimatorController.Instance.GetComponentsInChildren<ParticleSystem>(true);
-            foreach (var ps in particles)
-            {
-                if (ps != null && ps.name.ToLower().Contains("complete"))
-                {
-                    ps.transform.position = panTablePosition + new Vector3(0f, 0.4f, 0f);
-                }
-            }
+        //if (SequentialAnimatorController.Instance != null)
+        //{
+        //    //ParticleSystem[] particles = SequentialAnimatorController.Instance.GetComponentsInChildren<ParticleSystem>(true);
+        //    //foreach (var ps in particles)
+        //    //{
+        //    //    if (ps != null && ps.name.ToLower().Contains("complete"))
+        //    //    {
+        //    //        ps.transform.position = panTablePosition + new Vector3(0f, 0.4f, 0f);
+        //    //    }
+        //    //}
 
-            // Task update call hoga -> Sparkles cake pan ke upar hi chalengi!
-            SequentialAnimatorController.Instance.UpdateTask();
-        }
+        //    // Task update call hoga -> Sparkles cake pan ke upar hi chalengi!
+        //    SequentialAnimatorController.Instance.UpdateTask();
+        //}
 
         // ----------------------------------------------------------------------------------
         // STEP 6: Sparkles ke sath Cake Pan ka Soft Pop Bounce
         // ----------------------------------------------------------------------------------
         if (bakePanDraggable != null)
         {
+            if (SequentialAnimatorController.Instance != null)
+                SequentialAnimatorController.Instance.UpdateTask();
+
             Transform panTransform = bakePanDraggable.transform;
             panTransform.DOKill();
 
@@ -309,6 +312,8 @@ public class Recipe3Controller : MonoBehaviour
 
             yield return calmPopSeq.WaitForCompletion();
             panTransform.localScale = panTableScale;
+
+            
         }
 
         // ----------------------------------------------------------------------------------
@@ -316,7 +321,6 @@ public class Recipe3Controller : MonoBehaviour
         // ----------------------------------------------------------------------------------
         if (panSlideOut != null)
         {
-            panSlideOut.gameObject.SetActive(true);
             panSlideOut.enabled = true;
         }
      

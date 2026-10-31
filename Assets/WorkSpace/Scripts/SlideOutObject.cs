@@ -34,8 +34,8 @@ public class SlideOutObject : MonoBehaviour
     }
     private void Start()
     {
-        if(this !=null)
-            this.gameObject.SetActive(true);
+        //if(this !=null)
+        //    this.gameObject.SetActive(true);
     }
     private IEnumerator SlideOut()
     {

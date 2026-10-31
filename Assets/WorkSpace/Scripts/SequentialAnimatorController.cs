@@ -212,7 +212,7 @@ public class SequentialAnimatorController : MonoBehaviour
 
             if (currentActiveTool != null)
             {
-                StartCoroutine(DisableObjectAfterDelay(currentActiveTool));
+                StartCoroutine(DisableObjectAfterDelay(currentActiveTool,true));
                 currentActiveTool = null;
             }
 
@@ -227,7 +227,7 @@ public class SequentialAnimatorController : MonoBehaviour
         {
             GameObject completedObject = currentSequence.objects[currentObjectIndex];
             if (completedObject != null)
-                StartCoroutine(DisableObjectAfterDelay(completedObject));
+                StartCoroutine(DisableObjectAfterDelay(completedObject,false));
         }
 
         StartCoroutine(CompleteCurrentItem());
@@ -248,12 +248,12 @@ public class SequentialAnimatorController : MonoBehaviour
         PlayCurrentTask();
     }
 
-    private IEnumerator DisableObjectAfterDelay(GameObject completedObject)
+    private IEnumerator DisableObjectAfterDelay(GameObject completedObject, bool flag)
     {
         if (previousObjectDisableDelay > 0f)
             yield return new WaitForSeconds(previousObjectDisableDelay);
 
-        if (completedObject != null)
+        if (completedObject != null && flag)
             completedObject.SetActive(false);
     }
 
