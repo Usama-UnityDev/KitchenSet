@@ -58,6 +58,9 @@ public class KnifeDraggable : MonoBehaviour
     private bool isFrostingDone = false;
     private float currentFrostingProgress = 0f;
 
+    // Track: kya progress bar abhi visible hai (taake baar baar show/hide na ho)
+    private bool isProgressBarVisible = false;
+
     // Boundary Extents
     private float leftExtent;
     private float rightExtent;
@@ -71,6 +74,9 @@ public class KnifeDraggable : MonoBehaviour
     private Collider2D myCollider;
     private Coroutine returnCoroutine;
     private Coroutine scaleCoroutine;
+
+    // Shader-based cream fill ke liye cached property block
+    private MaterialPropertyBlock mpb;
 
     private void Awake()
     {
@@ -95,29 +101,37 @@ public class KnifeDraggable : MonoBehaviour
             initialCreamLocalScale = bowlCreamTransform.localScale;
             initialCreamLocalPos = bowlCreamTransform.localPosition;
         }
+
+        // Shader fill ke liye MaterialPropertyBlock cache karein
+        mpb = new MaterialPropertyBlock();
     }
 
     private void Start()
     {
-        // 1. Cake Layer ka Animator disable karein taake alpha code se control ho
+        // 1. Cake Layer ka Animator disable karein — shader fill se control hoga
         if (cakeLayerRenderer != null)
         {
             Animator anim = cakeLayerRenderer.GetComponent<Animator>();
             if (anim != null) anim.enabled = false;
 
+            // Alpha FULL rakhein — shader khud fill control karega
             Color c = cakeLayerRenderer.color;
-            c.a = 0f;
+            c.a = 1f;
             cakeLayerRenderer.color = c;
+
+            // Shader fill zero par start — cream abhi nahi dikhegi
+            SetCakeLayerAlpha(0f);
         }
 
         // 2. Screen Extents mathematically calculate karein
         CalculateExtents();
 
-        // 3. Progress Bar ko recipe start par zero par set karein
+        // 3. Progress Bar ko start par HIDE rakhein — sirf cake ke trigger mein show hogi
         if (useProgressBar && SequentialAnimatorController.Instance != null)
         {
-            SequentialAnimatorController.Instance.ShowProgressBar(0f);
+            SequentialAnimatorController.Instance.HideProgressBar();
         }
+        isProgressBarVisible = false;
     }
 
     private void CalculateExtents()
@@ -168,10 +182,8 @@ public class KnifeDraggable : MonoBehaviour
             StartVisualScale(punchScale);
         }
 
-        if (useProgressBar && SequentialAnimatorController.Instance != null)
-        {
-            SequentialAnimatorController.Instance.ShowProgressBar(currentFrostingProgress);
-        }
+        // NOTE: Progress bar yahan show NAHI hogi
+        // Sirf jab knife cake ke trigger mein enter kare tab show hogi (OnTriggerEnter2D / CheckCakeContact)
     }
 
     private void OnMouseDrag()
@@ -205,7 +217,27 @@ public class KnifeDraggable : MonoBehaviour
         // -------------------------------------------------------------
         // 2. Cake Contact Check
         // -------------------------------------------------------------
+        bool wasOverCake = isOverCake;
         CheckCakeContact();
+
+        // -------------------------------------------------------------
+        // 2b. Progress Bar Show/Hide based on cake contact
+        // -------------------------------------------------------------
+        if (useProgressBar && SequentialAnimatorController.Instance != null)
+        {
+            // Jab knife PEHLI DAFA cake ke trigger mein aaye → bar SHOW karo
+            if (isOverCake && !wasOverCake)
+            {
+                SequentialAnimatorController.Instance.ShowProgressBar(currentFrostingProgress);
+                isProgressBarVisible = true;
+            }
+            // Jab knife cake se BAHAR nikle → bar HIDE karo
+            else if (!isOverCake && wasOverCake)
+            {
+                SequentialAnimatorController.Instance.HideProgressBar();
+                isProgressBarVisible = false;
+            }
+        }
 
         // -------------------------------------------------------------
         // 3. Smooth Progressive Frosting + Progress Bar + Bowl Cream Drop
@@ -267,6 +299,13 @@ public class KnifeDraggable : MonoBehaviour
         if (other.CompareTag(cakeTag) || other == cakeCollider)
         {
             isOverCake = true;
+
+            // Jab knife cake ke trigger mein enter kare → progress bar SHOW karo
+            if (useProgressBar && SequentialAnimatorController.Instance != null && isDragging && !isFrostingDone)
+            {
+                SequentialAnimatorController.Instance.ShowProgressBar(currentFrostingProgress);
+                isProgressBarVisible = true;
+            }
         }
     }
 
@@ -275,6 +314,13 @@ public class KnifeDraggable : MonoBehaviour
         if (other.CompareTag(cakeTag) || other == cakeCollider)
         {
             isOverCake = false;
+
+            // Jab knife cake se bahar nikle → progress bar HIDE karo
+            if (useProgressBar && SequentialAnimatorController.Instance != null && isDragging && !isFrostingDone)
+            {
+                SequentialAnimatorController.Instance.HideProgressBar();
+                isProgressBarVisible = false;
+            }
         }
     }
 
@@ -282,9 +328,18 @@ public class KnifeDraggable : MonoBehaviour
     {
         if (cakeLayerRenderer != null)
         {
-            Color c = cakeLayerRenderer.color;
-            c.a = alpha;
-            cakeLayerRenderer.color = c;
+            if (mpb == null) mpb = new MaterialPropertyBlock();
+            cakeLayerRenderer.GetPropertyBlock(mpb);
+            mpb.SetFloat("_FillAmount", alpha);
+            cakeLayerRenderer.SetPropertyBlock(mpb);
+
+            // Safety: agar custom shader na laga ho to normal alpha fade chalay
+            if (cakeLayerRenderer.sharedMaterial == null || !cakeLayerRenderer.sharedMaterial.HasProperty("_FillAmount"))
+            {
+                Color c = cakeLayerRenderer.color;
+                c.a = alpha;
+                cakeLayerRenderer.color = c;
+            }
         }
     }
 
@@ -314,6 +369,13 @@ public class KnifeDraggable : MonoBehaviour
         if (enableScalePunch)
         {
             StartVisualScale(initialLocalScale);
+        }
+
+        // Progress bar HIDE karo jab user drag chhoray
+        if (useProgressBar && SequentialAnimatorController.Instance != null && isProgressBarVisible)
+        {
+            SequentialAnimatorController.Instance.HideProgressBar();
+            isProgressBarVisible = false;
         }
 
         // Return to Bowl (Progress wahi freeze rahegi)
@@ -366,6 +428,7 @@ public class KnifeDraggable : MonoBehaviour
         if (useProgressBar && SequentialAnimatorController.Instance != null)
         {
             SequentialAnimatorController.Instance.HideProgressBar();
+            isProgressBarVisible = false;
         }
 
         // Knife wapis bowl mein return ho

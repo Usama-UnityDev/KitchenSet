@@ -6,7 +6,7 @@ public class Recipe4Controller : MonoBehaviour
 {
     public static Recipe4Controller Instance { get; private set; }
 
-    [Header("--- References ---")]
+    [Header("--- Base Cake & Bowl References ---")]
     [SerializeField] private GameObject creamBowlParent;
     [SerializeField] private SlideOutObject creamBowlSlideOut;
     [SerializeField] private Transform completedCakeTransform;
@@ -14,6 +14,19 @@ public class Recipe4Controller : MonoBehaviour
 
     [Header("--- Polish & Juice Settings ---")]
     [SerializeField] private float cakePopScaleMultiplier = 1.18f;
+
+    [Header("--- Generic Decoration Panel Settings ---")]
+    [Tooltip("Tick karein agar cake frosting ke baad side decoration panel khulwana ho (Recipe 1 ki tarah toggleable)")]
+    public bool requireDecorationPanel = true;
+
+    [Tooltip("Side par aane wala decoration selection panel")]
+    public GameObject decorationPanel;
+
+    [Tooltip("Interactive Cream Bag / Piping Cone Tool")]
+    public CreamBagDraggable creamBagTool;
+
+    [Tooltip("Generic Topping Dropper (Strawberries, Sprinkles, Clusters)")]
+    public CakeToppingDropper toppingDropper;
 
     private Vector3 cakeOriginalScale;
 
@@ -28,6 +41,13 @@ public class Recipe4Controller : MonoBehaviour
         {
             cakeOriginalScale = completedCakeTransform.localScale;
         }
+
+        // Shuru mein decoration panel aur piping bag hide rahein
+        if (decorationPanel != null)
+            decorationPanel.SetActive(false);
+
+        if (creamBagTool != null)
+            creamBagTool.gameObject.SetActive(false);
     }
 
     public void OnFrostingFinished()
@@ -47,7 +67,7 @@ public class Recipe4Controller : MonoBehaviour
             yield return new WaitForSeconds(creamBowlSlideOut.duration > 0f ? creamBowlSlideOut.duration : 0.8f);
         }
 
-        // 3. Sparkles aur Success Chime cake ke theek upar play karein
+        // 3. Sparkles cake ke upar play karein
         if (SequentialAnimatorController.Instance != null && completedCakeTransform != null)
         {
             ParticleSystem[] particles = SequentialAnimatorController.Instance.GetComponentsInChildren<ParticleSystem>(true);
@@ -60,7 +80,7 @@ public class Recipe4Controller : MonoBehaviour
             }
         }
 
-        // 4. Finished Frosted Cake ka Soft Pop Bounce (Squash & Stretch Juice)
+        // 4. Cake Soft Pop Bounce
         if (completedCakeTransform != null)
         {
             completedCakeTransform.DOKill();
@@ -73,19 +93,66 @@ public class Recipe4Controller : MonoBehaviour
             completedCakeTransform.localScale = cakeOriginalScale;
         }
 
-        // 5. Cake Slide Out karein (agar cake bahar bhejna ho)
-        if (cakeSlideOut != null)
+        // 5. Agar Decoration Panel required hai toh open karein
+        if (requireDecorationPanel && decorationPanel != null)
         {
-            cakeSlideOut.enabled = true;
-            yield return new WaitForSeconds(cakeSlideOut.duration > 0f ? cakeSlideOut.duration : 0.8f);
-        }
+            decorationPanel.SetActive(true);
 
-        // 6. Central Controller UpdateTask trigger karein
+            // Piping tool complete hone par callback
+            if (creamBagTool != null)
+            {
+                creamBagTool.OnCompleted = () =>
+                {
+                    // Piping complete hone ke baad bhi panel open rehta hai taake toppings select ho sakein
+                };
+            }
+        }
+        else
+        {
+            // Agar decoration panel uncheck ho toh direct task complete
+            FinishWholeRecipe();
+        }
+    }
+
+    #region UI Panel Button Hookups
+
+    /// <summary>
+    /// Panel se Cream Bag button click karne par piping bag screen mein cake ke paas enter hogi
+    /// </summary>
+    public void OnClickCreamBagButton()
+    {
+        if (creamBagTool != null)
+        {
+            creamBagTool.EnterScreen();
+        }
+    }
+
+    /// <summary>
+    /// Panel se kisi bhi topping button (e.g. "strawberry", "sprinkles", "topping1") par click hone par
+    /// </summary>
+    public void OnClickToppingButton(string toppingId)
+    {
+        if (toppingDropper != null)
+        {
+            toppingDropper.DropTopping(toppingId);
+        }
+    }
+
+    /// <summary>
+    /// Poori decoration khatam hone par final Next button se call karein
+    /// </summary>
+    public void FinishWholeRecipe()
+    {
+        if (decorationPanel != null)
+            decorationPanel.SetActive(false);
+
         if (SequentialAnimatorController.Instance != null)
         {
             SequentialAnimatorController.Instance.UpdateTask();
         }
     }
+
+    #endregion
 
     private void OnDestroy()
     {
