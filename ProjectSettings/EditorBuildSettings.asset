@@ -9,7 +9,7 @@ EditorBuildSettings:
     path: Assets/Cake Maker/Christmas Cake Making/Scenes/CakeMaking.unity
     guid: bb397b9327de831449481a71b918b19b
   - enabled: 1
-    path: Assets/Common/Home.unity
-    guid: 8f2eb017e1dfb3d4294371c1e75cb592
+    path: Assets/Cake Maker/Juice/Juice.unity
+    guid: 90bb28860f6f7c545bf5ab47923bbccd
   m_configObjects: {}
   m_UseUCBPForAssetBundles: 0
