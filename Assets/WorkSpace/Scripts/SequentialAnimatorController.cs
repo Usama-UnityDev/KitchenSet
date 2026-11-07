@@ -89,6 +89,29 @@ public class SequentialAnimatorController : MonoBehaviour
         PlayCurrentTask();
     }
 
+    /// <summary>Enter a registered stage directly, including a presentation with no ingredient tasks.</summary>
+    public void StartSequence(GameObject recipeRoot)
+    {
+        int index = sequences.FindIndex(sequence => sequence.recipeRootObject == recipeRoot);
+        if (index < 0) { Debug.LogError("Presentation stage is not registered in the sequence.", recipeRoot); return; }
+        StopAllCoroutines();
+        currentSequenceIndex = index;
+        currentObjectIndex = 0;
+        isChangingSequence = isChangingItem = isToolSelectionPhase = false;
+        currentActiveTool = null;
+        HideProgressBar();
+        if (recipeLoadingPanel != null) recipeLoadingPanel.SetActive(false);
+        foreach (ObjectSequence sequence in sequences)
+            if (sequence.recipeRootObject != null && sequence.recipeRootObject != recipeRoot)
+                sequence.recipeRootObject.SetActive(false);
+        recipeRoot.SetActive(true);
+        if (sequences[index].objects.Count > 0)
+        {
+            ActivateAllObjectsInCurrentSequence(sequences[index]);
+            PlayCurrentTask();
+        }
+    }
+
     public void Initialize()
     {
         StopAllCoroutines();

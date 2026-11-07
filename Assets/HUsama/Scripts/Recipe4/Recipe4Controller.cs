@@ -11,25 +11,28 @@ public class Recipe4Controller : MonoBehaviour
     [SerializeField] private SlideOutObject creamBowlSlideOut;
     [SerializeField] private Transform completedCakeTransform;
     [SerializeField] private SlideOutObject cakeSlideOut;
+    [SerializeField] private Transform cakeItems;
+    [SerializeField] private CakeFinalPresentation finalPresentation;
 
     [Header("--- Polish & Juice Settings ---")]
     [SerializeField] private float cakePopScaleMultiplier = 1.18f;
 
-    [Header("--- Generic Decoration Panel Settings ---")]
-    [Tooltip("Tick karein agar cake frosting ke baad side decoration panel khulwana ho (Recipe 1 ki tarah toggleable)")]
-    public bool requireDecorationPanel = true;
+    //[Header("--- Generic Decoration Panel Settings ---")]
+    //[Tooltip("Tick karein agar cake frosting ke baad side decoration panel khulwana ho (Recipe 1 ki tarah toggleable)")]
+    //public bool requireDecorationPanel = true;
 
-    [Tooltip("Side par aane wala decoration selection panel")]
-    public GameObject decorationPanel;
+    //[Tooltip("Side par aane wala decoration selection panel")]
+    //public GameObject decorationPanel;
 
-    [Tooltip("Interactive Cream Bag / Piping Cone Tool")]
-    public CreamBagDraggable creamBagTool;
+    //[Tooltip("Interactive Cream Bag / Piping Cone Tool")]
+    //public CreamBagDraggable creamBagTool;
 
-    [Tooltip("Generic Topping Dropper (Strawberries, Sprinkles, Clusters)")]
-    public CakeToppingDropper toppingDropper;
+    //[Tooltip("Generic Topping Dropper (Strawberries, Sprinkles, Clusters)")]
+    //public CakeToppingDropper toppingDropper;
 
     private Vector3 cakeOriginalScale;
-
+    private bool frostingFinished;
+    private bool recipeFinished;
     private void Awake()
     {
         Instance = this;
@@ -43,16 +46,27 @@ public class Recipe4Controller : MonoBehaviour
         }
 
         // Shuru mein decoration panel aur piping bag hide rahein
-        if (decorationPanel != null)
-            decorationPanel.SetActive(false);
+        //if (decorationPanel != null)
+        //    decorationPanel.SetActive(false);
 
-        if (creamBagTool != null)
-            creamBagTool.gameObject.SetActive(false);
+        //if (creamBagTool != null)
+        //    creamBagTool.gameObject.SetActive(false);
     }
 
     public void OnFrostingFinished()
     {
+        if (frostingFinished) return;
+        frostingFinished = true;
         StartCoroutine(CompleteStageFlowRoutine());
+    }
+
+    public void PopCake()
+    {
+        if (completedCakeTransform == null) return;
+        completedCakeTransform.DOKill();
+        completedCakeTransform.localScale = cakeOriginalScale;
+        DOTween.Sequence().Append(completedCakeTransform.DOScale(cakeOriginalScale * 1.065f, 0.16f).SetEase(Ease.OutSine))
+            .Append(completedCakeTransform.DOScale(cakeOriginalScale, 0.24f).SetEase(Ease.OutBack));
     }
 
     private IEnumerator CompleteStageFlowRoutine()
@@ -93,25 +107,27 @@ public class Recipe4Controller : MonoBehaviour
             completedCakeTransform.localScale = cakeOriginalScale;
         }
 
-        // 5. Agar Decoration Panel required hai toh open karein
-        if (requireDecorationPanel && decorationPanel != null)
-        {
-            decorationPanel.SetActive(true);
+        GetComponent<CakeDecorationController>()?.BeginDecoration();
 
-            // Piping tool complete hone par callback
-            if (creamBagTool != null)
-            {
-                creamBagTool.OnCompleted = () =>
-                {
-                    // Piping complete hone ke baad bhi panel open rehta hai taake toppings select ho sakein
-                };
-            }
-        }
-        else
-        {
-            // Agar decoration panel uncheck ho toh direct task complete
-            FinishWholeRecipe();
-        }
+        //// 5. Agar Decoration Panel required hai toh open karein
+        //if (requireDecorationPanel && decorationPanel != null)
+        //{
+        //    decorationPanel.SetActive(true);
+
+        //    // Piping tool complete hone par callback
+        //    if (creamBagTool != null)
+        //    {
+        //        creamBagTool.OnCompleted = () =>
+        //        {
+        //            // Piping complete hone ke baad bhi panel open rehta hai taake toppings select ho sakein
+        //        };
+        //    }
+        //}
+        //else
+        //{
+        //    // Agar Decoration Panel uncheck ho toh direct task complete
+        //    FinishWholeRecipe();
+        //}
     }
 
     #region UI Panel Button Hookups
@@ -121,10 +137,10 @@ public class Recipe4Controller : MonoBehaviour
     /// </summary>
     public void OnClickCreamBagButton()
     {
-        if (creamBagTool != null)
-        {
-            creamBagTool.EnterScreen();
-        }
+        //if (creamBagTool != null)
+        //{
+        //    creamBagTool.EnterScreen();
+        //}
     }
 
     /// <summary>
@@ -132,10 +148,10 @@ public class Recipe4Controller : MonoBehaviour
     /// </summary>
     public void OnClickToppingButton(string toppingId)
     {
-        if (toppingDropper != null)
-        {
-            toppingDropper.DropTopping(toppingId);
-        }
+        //if (toppingDropper != null)
+        //{
+        //    toppingDropper.DropTopping(toppingId);
+        //}
     }
 
     /// <summary>
@@ -143,8 +159,17 @@ public class Recipe4Controller : MonoBehaviour
     /// </summary>
     public void FinishWholeRecipe()
     {
-        if (decorationPanel != null)
-            decorationPanel.SetActive(false);
+        if (recipeFinished) return;
+        var decoration = GetComponent<CakeDecorationController>();
+        if (decoration != null && !decoration.IsComplete) return;
+        recipeFinished = true;
+        if (finalPresentation != null)
+        {
+            StartCoroutine(finalPresentation.PrepareAndPresent(completedCakeTransform, cakeItems, cakeSlideOut));
+            return;
+        }
+        //if (decorationPanel != null)
+        //    decorationPanel.SetActive(false);
 
         if (SequentialAnimatorController.Instance != null)
         {

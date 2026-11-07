@@ -24,6 +24,7 @@ public class SlideOutObject : MonoBehaviour
     private Vector3 startPosition;
     private Vector3 targetPosition;
     private bool isPlaying = false;
+    public event System.Action Completed;
 
     private void OnEnable()
     {
@@ -69,8 +70,14 @@ public class SlideOutObject : MonoBehaviour
         transform.position = targetPosition;
 
         // Animation complete hone ke baad object OFF
+        isPlaying = false;
         gameObject.SetActive(false);
+        Completed?.Invoke();
+    }
 
+    private void OnDisable()
+    {
+        StopAllCoroutines();
         isPlaying = false;
     }
 
