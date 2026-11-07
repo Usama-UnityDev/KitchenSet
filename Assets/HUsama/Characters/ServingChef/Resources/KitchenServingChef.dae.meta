@@ -3,7 +3,17 @@ guid: 8ff5bcb86943f5943ac95206115d5336
 ModelImporter:
   serializedVersion: 24200
   internalIDToNameTable: []
-  externalObjects: {}
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: f110_A_head
+    second: {fileID: 2100000, guid: 7180d98f81b98af4e99066f752936e34, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: f110_body
+    second: {fileID: 2100000, guid: f301efaea6e16e14f9bc1d516b5afdf4, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0
@@ -72,7 +82,7 @@ ModelImporter:
     strictVertexDataChecks: 0
   tangentSpace:
     normalSmoothAngle: 60
-    normalImportMode: 0
+    normalImportMode: 1
     tangentImportMode: 3
     normalCalculationMode: 4
     legacyComputeAllNormalsFromSmoothingGroupsWhenMeshHasBlendShapes: 0
