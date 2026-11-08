@@ -298,21 +298,27 @@ public sealed class PeachCutRecipe : MonoBehaviour
 
         knifeTransform.localScale = restScale;
         float contactY = fruit.max.y - knifeTransform.TransformVector(BladeHeel).y;
+        const float contactProgress = 0.20f;
         bool madeContact = false;
         for (float t = 0f; t < sliceDuration; t += Time.deltaTime)
         {
             float progress = t / sliceDuration;
-            float depth = progress * progress * (2f - progress);
-            Vector3 cutPosition = Vector3.Lerp(cutStart, cutEnd, depth);
+            float throughFruit = Mathf.InverseLerp(contactProgress, 1f, progress);
+            // Ease into the skin, build pressure, then accelerate through the flesh and ease to a stop.
+            float depth = throughFruit * throughFruit * throughFruit * (4f - 3f * throughFruit);
+            Vector3 cutPosition = cutStart;
+            cutPosition.y = progress < contactProgress
+                ? Mathf.SmoothStep(cutStart.y, contactY, progress / contactProgress)
+                : Mathf.Lerp(contactY, cutEnd.y, depth);
             knifeTransform.position = cutPosition;
 
-            if (!madeContact && cutPosition.y <= contactY)
+            if (!madeContact && progress >= contactProgress)
             {
                 madeContact = true;
                 PlayCutSound();
             }
 
-            float compression = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(contactY, cutEnd.y, cutPosition.y));
+            float compression = Mathf.SmoothStep(0f, 1f, throughFruit / 0.32f);
             SetPeachPressure(fruit, compression);
             yield return null;
         }

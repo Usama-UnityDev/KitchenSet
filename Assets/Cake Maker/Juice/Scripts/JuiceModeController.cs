@@ -12,15 +12,25 @@ public sealed class JuiceModeController : MonoBehaviour
 
     [Header("Recipe Loading")]
     [SerializeField] private GameObject loadingPanel;
-    [Tooltip("Seconds after the recipe exits before showing Loading.")]
+    [Tooltip("Default seconds after a recipe exits before showing Loading.")]
     [SerializeField, Min(0f)] private float loadingDelay;
-    [Tooltip("Seconds to show Loading before continuing.")]
+    [Tooltip("Default seconds to show Loading before continuing.")]
     [SerializeField, Min(0f)] private float loadingDuration = 0.65f;
+    [Tooltip("Override Loading delay and duration after the assigned recipe exits.")]
+    [SerializeField] private RecipeLoadingTiming[] recipeLoadingTimings = Array.Empty<RecipeLoadingTiming>();
 
     [Header("Final Recipe")]
     [SerializeField] private GameObject toppingSelectionPanel;
     [SerializeField] private GameObject winPanel;
     [SerializeField] private UnityEvent<int> toppingSelected;
+
+    [Serializable]
+    private struct RecipeLoadingTiming
+    {
+        public GameObject recipe;
+        [Min(0f)] public float delay;
+        [Min(0f)] public float duration;
+    }
 
     private enum Phase { Playing, Toppings, Exiting, Loading, Won, PreviewComplete }
     private Phase phase;
@@ -131,18 +141,30 @@ public sealed class JuiceModeController : MonoBehaviour
             return;
         }
 
+        float delay = loadingDelay;
+        float duration = loadingDuration;
+        foreach (RecipeLoadingTiming timing in recipeLoadingTimings)
+        {
+            if (timing.recipe != recipes[recipeIndex])
+                continue;
+
+            delay = timing.delay;
+            duration = timing.duration;
+            break;
+        }
+
         phase = Phase.Loading;
-        loadingTransition = StartCoroutine(ShowLoading());
+        loadingTransition = StartCoroutine(ShowLoading(delay, duration));
     }
 
-    private IEnumerator ShowLoading()
+    private IEnumerator ShowLoading(float delay, float duration)
     {
-        if (loadingDelay > 0f)
-            yield return new WaitForSecondsRealtime(loadingDelay);
+        if (delay > 0f)
+            yield return new WaitForSecondsRealtime(delay);
 
         loadingPanel.SetActive(true);
-        if (loadingDuration > 0f)
-            yield return new WaitForSecondsRealtime(loadingDuration);
+        if (duration > 0f)
+            yield return new WaitForSecondsRealtime(duration);
         else
             yield return null;
 

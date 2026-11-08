@@ -19,6 +19,8 @@ public class SpriteEnterAnimation : MonoBehaviour
     public float duration = 0.6f;
     public float delay = 0f;
     [SerializeField] private bool replayOnEnable;
+    [SerializeField, Tooltip("Wait for a controller to call PlayTo before entering.")]
+    private bool manualStart;
 
     public bool IsComplete { get; private set; }
 
@@ -28,6 +30,9 @@ public class SpriteEnterAnimation : MonoBehaviour
 
     private void Awake()
     {
+        if (manualStart)
+            return;
+
         // Scene mein sprite ki original/final position save karo
         originalPosition = transform.position;
 
@@ -35,7 +40,7 @@ public class SpriteEnterAnimation : MonoBehaviour
             return;
 
         // Khud calculate karo ke sprite kahan se start hogi
-        startPosition = GetStartPosition();
+        startPosition = GetStartPosition(originalPosition);
 
         // Sprite ko automatically screen ke bahar move karo
         transform.position = startPosition;
@@ -43,43 +48,49 @@ public class SpriteEnterAnimation : MonoBehaviour
 
     private void Start()
     {
-        if (!replayOnEnable)
-            StartCoroutine(EnterAnimation());
+        if (!replayOnEnable && !manualStart)
+            StartCoroutine(EnterAnimation(originalPosition));
     }
 
     private void OnEnable()
     {
-        if (!replayOnEnable)
-            return;
+        if (replayOnEnable && !manualStart)
+            PlayTo(originalPosition);
+    }
 
+    public void PlayTo(Vector3 destination)
+    {
+        if (entrance != null)
+            StopCoroutine(entrance);
         IsComplete = false;
-        startPosition = GetStartPosition();
+        startPosition = GetStartPosition(destination);
         transform.position = startPosition;
-        entrance = StartCoroutine(EnterAnimation());
+        entrance = StartCoroutine(EnterAnimation(destination));
     }
 
     private void OnDisable()
     {
-        if (!replayOnEnable)
+        if (!replayOnEnable && !manualStart)
             return;
 
         if (entrance != null)
             StopCoroutine(entrance);
         entrance = null;
-        transform.position = originalPosition;
+        if (!manualStart)
+            transform.position = originalPosition;
     }
 
-    private Vector3 GetStartPosition()
+    private Vector3 GetStartPosition(Vector3 destination)
     {
         Camera cam = Camera.main;
 
         if (cam == null)
         {
             Debug.LogError("Main Camera nahi mili!");
-            return originalPosition;
+            return destination;
         }
 
-        Vector3 screenPosition = cam.WorldToScreenPoint(originalPosition);
+        Vector3 screenPosition = cam.WorldToScreenPoint(destination);
 
         // Sprite ki screen position ke hisaab se
         // usay screen ke completely bahar bhejo
@@ -105,12 +116,12 @@ public class SpriteEnterAnimation : MonoBehaviour
         Vector3 worldPosition = cam.ScreenToWorldPoint(screenPosition);
 
         // Z original jaisa hi rakho
-        worldPosition.z = originalPosition.z;
+        worldPosition.z = destination.z;
 
         return worldPosition;
     }
 
-    private IEnumerator EnterAnimation()
+    private IEnumerator EnterAnimation(Vector3 destination)
     {
         if (delay > 0)
             yield return new WaitForSeconds(delay);
@@ -127,14 +138,14 @@ public class SpriteEnterAnimation : MonoBehaviour
 
             transform.position = Vector3.Lerp(
                 startPosition,
-                originalPosition,
+                destination,
                 t
             );
             
             yield return null;
         }
 
-        transform.position = originalPosition;
+        transform.position = destination;
 
         // [NEW CODE] SpriteClickMover ko actual shelf position set karwayein
         SpriteClickMover mover = GetComponent<SpriteClickMover>();
@@ -148,7 +159,7 @@ public class SpriteEnterAnimation : MonoBehaviour
         // [NEW CODE] Loop khatam hone ke baad, animation complete par script ko disable karein
         IsComplete = true;
         entrance = null;
-        if (!replayOnEnable)
+        if (!replayOnEnable && !manualStart)
             enabled = false;
     }
 }
