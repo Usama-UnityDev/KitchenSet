@@ -78760,7 +78760,7 @@ MonoBehaviour:
   chefSprite: {fileID: 21300000, guid: bd532328d3baf0443939201ea17aaa10, type: 2}
   chefModelShader: {fileID: 4800000, guid: c4cc354f1f1d448f835cdffab46f9111, type: 3}
   presentationSpriteShader: {fileID: 4800000, guid: c4cc354f1f1d448f835cdffab46f9222, type: 3}
-  nextModeScene: Home
+  nextModeScene: Juice
   showerDuration: 1.5
   winPanel: {fileID: 920000000}
   winCard: {fileID: 920000011}

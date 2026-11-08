@@ -18,14 +18,21 @@ public class SpriteEnterAnimation : MonoBehaviour
     [Header("Animation")]
     public float duration = 0.6f;
     public float delay = 0f;
+    [SerializeField] private bool replayOnEnable;
+
+    public bool IsComplete { get; private set; }
 
     private Vector3 originalPosition;
     private Vector3 startPosition;
+    private Coroutine entrance;
 
     private void Awake()
     {
         // Scene mein sprite ki original/final position save karo
         originalPosition = transform.position;
+
+        if (replayOnEnable)
+            return;
 
         // Khud calculate karo ke sprite kahan se start hogi
         startPosition = GetStartPosition();
@@ -36,7 +43,30 @@ public class SpriteEnterAnimation : MonoBehaviour
 
     private void Start()
     {
-        StartCoroutine(EnterAnimation());
+        if (!replayOnEnable)
+            StartCoroutine(EnterAnimation());
+    }
+
+    private void OnEnable()
+    {
+        if (!replayOnEnable)
+            return;
+
+        IsComplete = false;
+        startPosition = GetStartPosition();
+        transform.position = startPosition;
+        entrance = StartCoroutine(EnterAnimation());
+    }
+
+    private void OnDisable()
+    {
+        if (!replayOnEnable)
+            return;
+
+        if (entrance != null)
+            StopCoroutine(entrance);
+        entrance = null;
+        transform.position = originalPosition;
     }
 
     private Vector3 GetStartPosition()
@@ -116,6 +146,9 @@ public class SpriteEnterAnimation : MonoBehaviour
             mover.SetOriginPosition(mover.transform.position);
         }
         // [NEW CODE] Loop khatam hone ke baad, animation complete par script ko disable karein
-        this.enabled = false;
+        IsComplete = true;
+        entrance = null;
+        if (!replayOnEnable)
+            enabled = false;
     }
 }
