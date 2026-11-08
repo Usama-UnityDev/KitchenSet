@@ -66741,6 +66741,8 @@ MonoBehaviour:
   direction: 0
   duration: 1
   delay: 0
+  replayOnEnable: 0
+  manualStart: 0
 --- !u!1 &15239890
 GameObject:
   m_ObjectHideFlags: 0
@@ -69173,6 +69175,8 @@ MonoBehaviour:
   direction: 0
   duration: 1
   delay: 0
+  replayOnEnable: 0
+  manualStart: 0
 --- !u!114 &219486573
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -72014,6 +72018,8 @@ MonoBehaviour:
   direction: 1
   duration: 1
   delay: 1
+  replayOnEnable: 0
+  manualStart: 0
 --- !u!1 &306946205
 GameObject:
   m_ObjectHideFlags: 0
@@ -72637,6 +72643,8 @@ MonoBehaviour:
   direction: 1
   duration: 1
   delay: 1
+  replayOnEnable: 0
+  manualStart: 0
 --- !u!114 &368879257
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -73557,6 +73565,8 @@ MonoBehaviour:
   direction: 3
   duration: 1
   delay: 1
+  replayOnEnable: 0
+  manualStart: 0
 --- !u!114 &486209119
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -74400,6 +74410,8 @@ MonoBehaviour:
   direction: 0
   duration: 1
   delay: 0
+  replayOnEnable: 0
+  manualStart: 0
 --- !u!114 &649899896
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -78340,6 +78352,8 @@ MonoBehaviour:
   direction: 1
   duration: 1
   delay: 1
+  replayOnEnable: 0
+  manualStart: 0
 --- !u!95 &886380558
 Animator:
   serializedVersion: 7
@@ -78832,6 +78846,8 @@ MonoBehaviour:
   direction: 2
   duration: 1
   delay: 1.5
+  replayOnEnable: 0
+  manualStart: 0
 --- !u!95 &911544902
 Animator:
   serializedVersion: 7
@@ -84365,6 +84381,8 @@ MonoBehaviour:
   direction: 3
   duration: 1
   delay: 1
+  replayOnEnable: 0
+  manualStart: 0
 --- !u!114 &1305900214
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -87357,6 +87375,8 @@ MonoBehaviour:
   direction: 0
   duration: 1
   delay: 1.5
+  replayOnEnable: 0
+  manualStart: 0
 --- !u!114 &1433595253
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -87801,6 +87821,8 @@ MonoBehaviour:
   direction: 0
   duration: 1
   delay: 1
+  replayOnEnable: 0
+  manualStart: 0
 --- !u!95 &1494819861
 Animator:
   serializedVersion: 7
@@ -88508,6 +88530,8 @@ MonoBehaviour:
   direction: 1
   duration: 1
   delay: 1
+  replayOnEnable: 0
+  manualStart: 0
 --- !u!114 &1614782615
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -88854,6 +88878,8 @@ MonoBehaviour:
   direction: 0
   duration: 1
   delay: 3.5
+  replayOnEnable: 0
+  manualStart: 0
 --- !u!95 &1675214379
 Animator:
   serializedVersion: 7
@@ -89467,6 +89493,8 @@ MonoBehaviour:
   direction: 0
   duration: 1
   delay: 2
+  replayOnEnable: 0
+  manualStart: 0
 --- !u!95 &1713810097
 Animator:
   serializedVersion: 7
@@ -90331,6 +90359,8 @@ MonoBehaviour:
   direction: 0
   duration: 1
   delay: 1
+  replayOnEnable: 0
+  manualStart: 0
 --- !u!114 &1880281504
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -90470,6 +90500,8 @@ MonoBehaviour:
   direction: 1
   duration: 1
   delay: 3
+  replayOnEnable: 0
+  manualStart: 0
 --- !u!95 &1899499808
 Animator:
   serializedVersion: 7
@@ -90651,6 +90683,8 @@ MonoBehaviour:
   direction: 0
   duration: 1
   delay: 0
+  replayOnEnable: 0
+  manualStart: 0
 --- !u!114 &1908009017
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -99361,6 +99395,8 @@ MonoBehaviour:
   direction: 3
   duration: 1
   delay: 2.5
+  replayOnEnable: 0
+  manualStart: 0
 --- !u!1 &7406090710911345795
 GameObject:
   m_ObjectHideFlags: 0
