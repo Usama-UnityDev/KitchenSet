@@ -16,6 +16,8 @@ public class SlideOutObject : MonoBehaviour
 
     [Header("Animation Settings")]
     public float duration = 0.6f;
+    [Tooltip("Turn off the GameObject after it leaves the screen.")]
+    [SerializeField] private bool deactivateOnComplete = true;
 
     [Header("Extra Distance")]
     [Tooltip("Screen se kitna extra bahar jana hai")]
@@ -69,9 +71,9 @@ public class SlideOutObject : MonoBehaviour
         // Exact final position
         transform.position = targetPosition;
 
-        // Animation complete hone ke baad object OFF
         isPlaying = false;
-        gameObject.SetActive(false);
+        if (deactivateOnComplete)
+            gameObject.SetActive(false);
         Completed?.Invoke();
     }
 

@@ -54,7 +54,6 @@ public sealed class JuiceModeController : MonoBehaviour
         foreach (GameObject recipe in recipes)
             Hide(recipe);
 
-        phase = Phase.Playing;
         previewing = false;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         previewing = previewRecipeIndex >= 0 && previewRecipeIndex < recipes.Length &&
@@ -214,6 +213,7 @@ public sealed class JuiceModeController : MonoBehaviour
     private void ActivateRecipe(int index)
     {
         recipeIndex = index;
+        phase = Phase.Playing;
         recipes[index].SetActive(true);
     }
 
