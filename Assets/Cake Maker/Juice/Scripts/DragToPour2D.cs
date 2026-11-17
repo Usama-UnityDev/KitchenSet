@@ -18,18 +18,24 @@ public sealed class DragToPour2D : MonoBehaviour
     [SerializeField] private ParticleSystem splash;
     [SerializeField] private SpriteMask sourceMask;
     [SerializeField] private SpriteRenderer sourceLiquid;
-    [SerializeField, Tooltip("Path along the inside wall from the belly to the lip, in mask-local coordinates.")]
+    [SerializeField, Tooltip("Points just inside the pouring side of the jug, from the belly to the lip, in mask-local coordinates.")]
     private Vector2[] sourceFlowPath;
     [SerializeField, Range(0.1f, 1f)] private float sourceStartLevel = 0.78f;
+    [SerializeField, Range(0f, 0.95f)] private float sourceRemainingFraction = 0.42f;
     [SerializeField] private SpriteRenderer receiverLiquid;
     [SerializeField, Range(0.5f, 1f)] private float receiverBaseWidth = 1f;
-    [SerializeField] private float maximumTilt = -100f;
+    [SerializeField] private float maximumTilt = -88f;
     [SerializeField, Min(0.1f)] private float spoutClearance = 1f;
     [SerializeField, Min(0.1f)] private float fillDuration = 1.65f;
     [SerializeField] private SlideOutObject jugExit;
+    [SerializeField] private Material completionParticleMaterial;
     [SerializeField] private UnityEvent poured;
 
-    private const float SpoutContactDepth = 0.1f;
+    private const float NeckLiquidDepth = 0.22f;
+    private const float ReceiverSurfaceDepth = 0.13f;
+    private const int StreamPointCount = 16;
+    private static readonly AnimationCurve SettlingSurfaceAngle = new AnimationCurve(
+        new Keyframe(0f, 0f), new Keyframe(0.28f, 19f), new Keyframe(0.76f, -5f), new Keyframe(1f, 0f));
 
     private enum Phase { Entering, Ready, Dragging, Busy }
 
@@ -38,6 +44,7 @@ public sealed class DragToPour2D : MonoBehaviour
     private Collider2D pickup;
     private SpriteEnterAnimation entrance;
     private Tween motion;
+    private Tween glassMotion;
     private Vector3 authoredPosition;
     private Vector3 home;
     private Quaternion restRotation;
@@ -52,12 +59,15 @@ public sealed class DragToPour2D : MonoBehaviour
     private Bounds liquidSpriteBounds;
     private Vector3 splashPosition;
     private LineRenderer stream;
-    private LineRenderer sourceFlow;
-    private Vector3[] sourceFlowPoints;
-    private float sourceFlowStrength;
+    private LineRenderer returnFlow;
+    private Vector3[] returnFlowPoints;
     private LiquidMaskArea sourceArea;
     private float sourceStartArea;
-    private float drained;
+    private float sourceRemainingArea;
+    private float settleProgress = 1f;
+    private float idleSloshTime;
+    private float idleSurfaceAngle;
+    private ParticleSystem completionParticles;
 
     private void Awake()
     {
@@ -76,13 +86,11 @@ public sealed class DragToPour2D : MonoBehaviour
         stream.useWorldSpace = true;
         stream.sortingLayerID = receiverLiquid.sortingLayerID;
         stream.sortingOrder = receiverLiquid.sortingOrder + 2;
-        stream.positionCount = 3;
-        stream.numCapVertices = 3;
-        stream.numCornerVertices = 2;
-        stream.widthCurve = new AnimationCurve(new Keyframe(0f, 0.84f),
-            new Keyframe(0.23f, 1f), new Keyframe(1f, 0.72f));
+        stream.positionCount = StreamPointCount;
+        stream.numCapVertices = 4;
+        stream.numCornerVertices = 3;
         Color juiceColor = sourceLiquid != null ? sourceLiquid.color : receiverLiquid.color;
-        stream.startColor = Color.Lerp(juiceColor, Color.white, 0.08f);
+        stream.startColor = juiceColor;
         stream.endColor = juiceColor;
 
         if (sourceMask != null && sourceLiquid != null)
@@ -90,27 +98,33 @@ public sealed class DragToPour2D : MonoBehaviour
             sourceArea = new LiquidMaskArea(sourceMask.sprite);
             sourceArea.Project(Matrix4x4.identity);
             sourceStartArea = sourceArea.AreaBelow(Mathf.Lerp(sourceArea.Bottom, sourceArea.Top, sourceStartLevel));
+
             if (sourceFlowPath != null && sourceFlowPath.Length >= 2)
             {
-                GameObject flow = new GameObject("Juice Inside Neck");
-                flow.transform.SetParent(sourceMask.transform, false);
-                sourceFlow = flow.AddComponent<LineRenderer>();
-                sourceFlow.enabled = false;
-                sourceFlow.sharedMaterial = streamMaterial;
-                sourceFlow.useWorldSpace = true;
-                sourceFlow.maskInteraction = SpriteMaskInteraction.VisibleInsideMask;
-                sourceFlow.sortingLayerID = sourceLiquid.sortingLayerID;
-                sourceFlow.sortingOrder = sourceLiquid.sortingOrder;
-                sourceFlow.startColor = sourceLiquid.color;
-                sourceFlow.endColor = sourceLiquid.color;
-                sourceFlow.numCornerVertices = 3;
-                sourceFlow.widthCurve = AnimationCurve.EaseInOut(0f, 0.6f, 1f, 1f);
-                sourceFlowPoints = new Vector3[sourceFlowPath.Length + 1];
+                GameObject runoff = new GameObject("Juice Returning Inside Jug");
+                runoff.transform.SetParent(sourceMask.transform, false);
+                returnFlow = runoff.AddComponent<LineRenderer>();
+                returnFlow.enabled = false;
+                returnFlow.sharedMaterial = streamMaterial;
+                returnFlow.useWorldSpace = true;
+                returnFlow.maskInteraction = SpriteMaskInteraction.VisibleInsideMask;
+                returnFlow.sortingLayerID = sourceLiquid.sortingLayerID;
+                returnFlow.sortingOrder = sourceLiquid.sortingOrder;
+                returnFlow.numCapVertices = 4;
+                returnFlow.numCornerVertices = 3;
+                returnFlow.widthCurve = new AnimationCurve(
+                    new Keyframe(0f, 0.24f), new Keyframe(0.35f, 0.86f), new Keyframe(1f, 1f));
+                returnFlow.startColor = new Color(juiceColor.r, juiceColor.g, juiceColor.b, juiceColor.a * 0.78f);
+                returnFlow.endColor = juiceColor;
+                returnFlowPoints = new Vector3[sourceFlowPath.Length];
             }
         }
 
         if (jugExit != null)
             jugExit.Completed += OnJugExited;
+
+        if (completionParticleMaterial != null)
+            CreateCompletionParticles();
     }
 
     private void OnEnable()
@@ -128,7 +142,9 @@ public sealed class DragToPour2D : MonoBehaviour
         }
 
         ClearPourEffects();
-        drained = 0f;
+        idleSloshTime = 0f;
+        idleSurfaceAngle = 0f;
+        sourceRemainingArea = sourceStartArea;
         SetFill(0f);
         UpdateSourceLiquid();
         splash.transform.localPosition = splashPosition;
@@ -147,6 +163,8 @@ public sealed class DragToPour2D : MonoBehaviour
         StopAllCoroutines();
         motion?.Kill();
         motion = null;
+        glassMotion?.Kill();
+        glassMotion = null;
         ClearPourEffects();
         if (jugExit != null)
             jugExit.enabled = false;
@@ -156,6 +174,8 @@ public sealed class DragToPour2D : MonoBehaviour
     {
         if (jugExit != null)
             jugExit.Completed -= OnJugExited;
+        if (completionParticles != null)
+            Destroy(completionParticles.gameObject);
     }
 
     private void Update()
@@ -204,9 +224,12 @@ public sealed class DragToPour2D : MonoBehaviour
 
     private IEnumerator ReturnHome()
     {
-        yield return MoveTo(home, restRotation, 0.24f).WaitForCompletion();
+        float distance = Vector3.Distance(transform.position, home);
+        float returnDuration = Mathf.Clamp(0.38f + distance * 0.045f, 0.38f, 0.8f);
+        yield return MoveTo(home, restRotation, returnDuration).WaitForCompletion();
         if (idleAnimator != null)
             idleAnimator.speed = 1f;
+        idleSloshTime = 0f;
         phase = Phase.Ready;
     }
 
@@ -219,66 +242,180 @@ public sealed class DragToPour2D : MonoBehaviour
             ? transform.worldToLocalMatrix * sourceMask.transform.localToWorldMatrix : Matrix4x4.identity;
         Quaternion angle = FindPourRotation(parentToWorld, maskInJug);
         Vector3 offset = SpoutOffset(parentToWorld, angle);
-        Vector3 pourPoint = new Vector3(glass.center.x, glass.max.y + spoutClearance, home.z + offset.z);
+        Vector3 pourPoint = new Vector3(glass.center.x - streamWidth * 0.7f, glass.max.y + spoutClearance, home.z + offset.z);
         yield return MoveTo(pourPoint - offset, angle, 0.32f).WaitForCompletion();
 
         const float travelTime = 0.22f;
-        bool hitGlass = false;
+        bool splashStarted = false;
         for (float elapsed = 0f; elapsed < fillDuration + travelTime; elapsed += Time.deltaTime)
         {
             // The glass receives the same amount after its travel time down the stream.
-            drained = Mathf.Clamp01(elapsed / fillDuration);
-            float received = Mathf.Clamp01((elapsed - travelTime) / fillDuration);
-            if (drained < 1f)
-            {
-                angle = FindPourRotation(parentToWorld, maskInJug);
-                transform.localRotation = angle;
-                transform.position = pourPoint - SpoutOffset(parentToWorld, angle);
-            }
+            float emitted = Mathf.Clamp01(elapsed / fillDuration);
+            float arrived = Mathf.Clamp01((elapsed - travelTime) / fillDuration);
+            sourceRemainingArea = sourceStartArea * Mathf.Lerp(1f, sourceRemainingFraction, TransferProgress(emitted));
+            angle = FindPourRotation(parentToWorld, maskInJug);
+            transform.localRotation = angle;
+            transform.position = pourPoint - SpoutOffset(parentToWorld, angle);
 
-            float surface = SetFill(received);
-            if (!hitGlass && elapsed >= travelTime)
+            float surface = SetFill(TransferProgress(arrived));
+            if (!splashStarted && elapsed >= travelTime)
             {
-                hitGlass = true;
                 splash.Play();
+                splashStarted = true;
             }
 
             float head = Mathf.Clamp01(elapsed / travelTime);
             float tail = Mathf.Clamp01((elapsed - fillDuration) / travelTime);
-            float strength = Mathf.Lerp(1f, 0.38f, Mathf.InverseLerp(0.8f, 1f, drained));
+            float strength = Mathf.Lerp(0.63f, 1f, Mathf.SmoothStep(0f, 1f, head));
+            strength *= Mathf.Lerp(1f, 0.48f, Mathf.InverseLerp(0.86f, 1f, emitted));
             DrawStream(surface, tail * tail, head * head, strength * (1f - tail));
             yield return null;
         }
-        drained = 1f;
-        SetFill(1f);
+        sourceRemainingArea = sourceStartArea * sourceRemainingFraction;
+        float fullSurface = SetFill(1f);
         stream.enabled = false;
-        sourceFlowStrength = 0f;
         splash.Stop(true, ParticleSystemStopBehavior.StopEmitting);
 
-        yield return MoveTo(transform.position, restRotation, 0.2f).WaitForCompletion();
+        yield return SettleJug();
+        motion = DOTween.Sequence()
+            .Append(transform.DOScale(restScale * 1.09f, 0.13f).SetEase(Ease.OutCubic))
+            .Append(transform.DOScale(restScale, 0.19f).SetEase(Ease.InOutSine));
         if (jugExit != null)
             jugExit.enabled = true;
-        else
-            poured?.Invoke();
+
+        yield return PlayGlassCompletion(glass, fullSurface);
+        while (jugExit != null && jugExit.enabled)
+            yield return null;
+        poured?.Invoke();
     }
+
+    private IEnumerator PlayGlassCompletion(Bounds glassBounds, float surface)
+    {
+        Transform glass = receiver.transform;
+        Vector3 restPosition = glass.localPosition;
+        Vector3 restGlassScale = glass.localScale;
+        float raisedY = glass.position.y + glassBounds.size.y * 0.11f;
+
+        if (completionParticles != null)
+        {
+            completionParticles.transform.position = new Vector3(glassBounds.center.x, surface + 0.14f, glassBounds.center.z);
+        }
+
+        glassMotion = DOTween.Sequence()
+            .AppendInterval(0.32f)
+            .AppendCallback(() => completionParticles?.Play())
+            .Append(glass.DOMoveY(raisedY, 0.18f).SetEase(Ease.OutCubic))
+            .Join(glass.DOScale(restGlassScale * 1.12f, 0.18f).SetEase(Ease.OutCubic))
+            .AppendInterval(0.22f)
+            .Append(glass.DOLocalMove(restPosition, 0.36f).SetEase(Ease.InOutSine))
+            .Join(glass.DOScale(restGlassScale, 0.36f).SetEase(Ease.InOutSine))
+            .OnKill(() =>
+            {
+                if (glass == null)
+                    return;
+                glass.localPosition = restPosition;
+                glass.localScale = restGlassScale;
+            });
+
+        yield return glassMotion.WaitForCompletion();
+        glassMotion = null;
+        while (completionParticles != null && completionParticles.IsAlive())
+            yield return null;
+    }
+
+    private void CreateCompletionParticles()
+    {
+        GameObject effect = new GameObject("CompletionParticles");
+        effect.SetActive(false);
+        effect.transform.SetParent(receiver.transform, false);
+
+        completionParticles = effect.AddComponent<ParticleSystem>();
+        var main = completionParticles.main;
+        main.duration = 0.7f;
+        main.loop = false;
+        main.playOnAwake = false;
+        main.cullingMode = ParticleSystemCullingMode.AlwaysSimulate;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.8f, 1.15f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(1.1f, 2.1f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.35f, 0.7f);
+        main.startRotation = new ParticleSystem.MinMaxCurve(-Mathf.PI, Mathf.PI);
+        main.gravityModifier = 0.12f;
+
+        var emission = completionParticles.emission;
+        emission.rateOverTime = 0f;
+        emission.SetBursts(new[]
+        {
+            new ParticleSystem.Burst(0.08f, 8),
+            new ParticleSystem.Burst(0.28f, 5),
+            new ParticleSystem.Burst(0.52f, 3)
+        });
+        var shape = completionParticles.shape;
+        shape.shapeType = ParticleSystemShapeType.Cone;
+        shape.rotation = new Vector3(-90f, 0f, 0f);
+        shape.angle = 55f;
+        shape.radius = 0.65f;
+        var size = completionParticles.sizeOverLifetime;
+        size.enabled = true;
+        size.size = new ParticleSystem.MinMaxCurve(1f,
+            new AnimationCurve(new Keyframe(0f, 0.55f), new Keyframe(0.22f, 1f), new Keyframe(1f, 0.5f)));
+
+        var color = completionParticles.colorOverLifetime;
+        color.enabled = true;
+        var fade = new Gradient();
+        fade.SetKeys(
+            new[] { new GradientColorKey(new Color(1f, 0.86f, 0.59f), 0f), new GradientColorKey(Color.white, 1f) },
+            new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.16f), new GradientAlphaKey(0f, 1f) });
+        color.color = fade;
+
+        var effectRenderer = effect.GetComponent<ParticleSystemRenderer>();
+        effectRenderer.sharedMaterial = completionParticleMaterial;
+        effectRenderer.sortingLayerID = receiverLiquid.sortingLayerID;
+        effectRenderer.sortingOrder = receiverLiquid.sortingOrder + 12;
+        effect.SetActive(true);
+    }
+
+    private IEnumerator SettleJug()
+    {
+        const float rightingDuration = 0.64f;
+        const float settleDuration = 0.78f;
+        Quaternion tiltedRotation = transform.localRotation;
+        for (float elapsed = 0f; elapsed < settleDuration; elapsed += Time.deltaTime)
+        {
+            settleProgress = elapsed / settleDuration;
+            float upright = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / rightingDuration));
+            transform.localRotation = Quaternion.Slerp(tiltedRotation, restRotation, upright);
+            yield return null;
+        }
+
+        transform.localRotation = restRotation;
+        settleProgress = 1f;
+    }
+
+    private static float TransferProgress(float time) => Mathf.Lerp(time, Mathf.SmoothStep(0f, 1f, time), 0.45f);
 
     private Quaternion FindPourRotation(Matrix4x4 parentToWorld, Matrix4x4 maskInJug)
     {
         if (sourceArea == null)
             return Quaternion.AngleAxis(maximumTilt * 0.5f, Vector3.forward) * restRotation;
 
-        float remainingArea = sourceStartArea * (1f - drained);
         float low = 0f;
         float high = 1f;
-        // Rotate around the spout until the remaining liquid reaches the lip.
+        // The surface must reach the whole channel. A cut through just the lip can leave a dry neck.
         for (int i = 0; i < 11; i++)
         {
             float turn = (low + high) * 0.5f;
             Quaternion angle = Quaternion.AngleAxis(maximumTilt * turn, Vector3.forward) * restRotation;
             Matrix4x4 jugPose = parentToWorld * Matrix4x4.TRS(Vector3.zero, angle, restScale);
-            sourceArea.Project(jugPose * maskInJug);
-            float lipHeight = jugPose.MultiplyPoint3x4(spoutLocal).y + SpoutContactDepth;
-            if (sourceArea.AreaBelow(lipHeight) > remainingArea)
+            Matrix4x4 maskPose = jugPose * maskInJug;
+            sourceArea.Project(maskPose);
+            float channelHeight = jugPose.MultiplyPoint3x4(spoutLocal).y;
+            if (sourceFlowPath != null)
+            {
+                foreach (Vector2 point in sourceFlowPath)
+                    channelHeight = Mathf.Max(channelHeight, maskPose.MultiplyPoint3x4(point).y);
+            }
+            if (sourceArea.AreaBelow(channelHeight + NeckLiquidDepth) > sourceRemainingArea)
                 low = turn;
             else
                 high = turn;
@@ -292,26 +429,32 @@ public sealed class DragToPour2D : MonoBehaviour
     private void OnJugExited()
     {
         jugExit.enabled = false;
-        poured?.Invoke();
+        if (!gameObject.activeInHierarchy)
+            poured?.Invoke();
     }
 
     private void DrawStream(float surface, float tail, float head, float strength)
     {
-        // Start under the jug artwork so the stream meets the rim without a gap.
         Vector3 outlet = spout.position;
-        outlet.x = Mathf.MoveTowards(outlet.x, transform.position.x, streamWidth * 0.38f);
-        outlet.y += SpoutContactDepth;
-        Vector3 impact = new Vector3(splash.transform.position.x, surface, outlet.z);
-        Vector3 top = Vector3.Lerp(outlet, impact, tail);
-        Vector3 bottom = Vector3.Lerp(outlet, impact, head);
-        Vector3 middle = Vector3.Lerp(top, bottom, 0.4f);
-        middle.x += (head - tail) * (0.055f + Mathf.Sin(Time.time * 13f) * 0.025f);
-        stream.widthMultiplier = streamWidth * strength * (1f + Mathf.Sin(Time.time * 18f) * 0.045f);
-        stream.SetPosition(0, top);
-        stream.SetPosition(1, middle);
-        stream.SetPosition(2, bottom);
         stream.enabled = head > tail;
-        sourceFlowStrength = tail == 0f && stream.enabled && drained < 1f ? strength : 0f;
+        if (!stream.enabled)
+            return;
+
+        // Overlap the filled mask under the jug artwork and let the stream curve down from the lip.
+        if (sourceMask != null && sourceFlowPath != null && sourceFlowPath.Length > 0)
+            outlet = sourceMask.transform.TransformPoint(sourceFlowPath[sourceFlowPath.Length - 1]);
+
+        Vector3 impact = new Vector3(splash.transform.position.x, surface, outlet.z);
+        Vector3 bend = spout.position;
+        bend.x = impact.x + streamWidth * (0.32f + Mathf.Sin(Time.time * 12f) * 0.08f);
+        bend.y -= (bend.y - surface) * 0.2f;
+        stream.startWidth = streamWidth * strength * Mathf.Lerp(1f, 0.68f, tail);
+        stream.endWidth = streamWidth * strength * Mathf.Lerp(1f, 0.68f, head);
+        for (int i = 0; i < StreamPointCount; i++)
+        {
+            float t = Mathf.Lerp(tail, head, i / (StreamPointCount - 1f));
+            stream.SetPosition(i, Vector3.Lerp(Vector3.Lerp(outlet, bend, t), Vector3.Lerp(bend, impact, t), t));
+        }
     }
 
     private float SetFill(float progress)
@@ -325,73 +468,117 @@ public sealed class DragToPour2D : MonoBehaviour
         level.localScale = scale;
         receiverLiquid.enabled = progress > 0f;
 
-        float surface = level.TransformPoint(0f, liquidSpriteBounds.max.y, 0f).y;
+        // The texture has an elliptical surface. Aim for its center instead of its back edge.
+        float surface = level.TransformPoint(0f, liquidSpriteBounds.max.y - liquidSpriteBounds.size.y * ReceiverSurfaceDepth, 0f).y;
         Vector3 impact = splash.transform.position;
         impact.y = surface;
         splash.transform.position = impact;
         return surface;
     }
 
-    private void LateUpdate() => UpdateSourceLiquid();
+    private void LateUpdate()
+    {
+        float targetAngle = 0f;
+        if (phase == Phase.Ready)
+        {
+            idleSloshTime += Time.deltaTime;
+            targetAngle = Mathf.Sin(idleSloshTime * (2f * Mathf.PI / 1.8f)) * 4.5f;
+        }
+
+        idleSurfaceAngle = Mathf.MoveTowards(idleSurfaceAngle, targetAngle, Time.deltaTime * 40f);
+        UpdateSourceLiquid();
+    }
 
     private void UpdateSourceLiquid()
     {
         if (sourceArea == null)
             return;
 
-        sourceLiquid.enabled = drained < 1f;
-        if (sourceFlow != null)
-            sourceFlow.enabled = sourceLiquid.enabled && sourceFlowStrength > 0f;
+        sourceLiquid.enabled = sourceRemainingArea > 0f;
         if (!sourceLiquid.enabled)
+        {
+            if (returnFlow != null)
+                returnFlow.enabled = false;
             return;
+        }
 
+        // Solve for the same volume along the moving surface, then let it level out.
+        float surfaceAngle = idleSurfaceAngle - SettlingSurfaceAngle.Evaluate(settleProgress) * Mathf.Sign(maximumTilt);
+        Quaternion surfaceRotation = Quaternion.AngleAxis(surfaceAngle, Vector3.forward);
+        Vector3 surfaceUp = surfaceRotation * Vector3.up;
+        Vector3 surfaceRight = surfaceRotation * Vector3.right;
         Bounds interior = sourceMask.bounds;
-        sourceArea.Project(sourceMask.transform.localToWorldMatrix);
-        float surface = sourceArea.FindHeight(sourceStartArea * (1f - drained));
+        Matrix4x4 maskToWorld = sourceMask.transform.localToWorldMatrix;
+        sourceArea.Project(Matrix4x4.Rotate(Quaternion.Inverse(surfaceRotation)) * maskToWorld);
+        float surface = sourceArea.FindHeight(sourceRemainingArea);
         float height = surface - sourceArea.Bottom;
+        float width = Mathf.Abs(surfaceRight.x) * interior.size.x + Mathf.Abs(surfaceRight.y) * interior.size.y;
 
-        // Keep the surface level in world space while the jug rotates around it.
         Transform liquid = sourceLiquid.transform;
-        liquid.rotation = Quaternion.identity;
+        liquid.rotation = surfaceRotation;
         Transform parent = liquid.parent;
         Bounds sprite = sourceLiquid.sprite.bounds;
         float unitsX = parent.TransformVector(liquid.localRotation * Vector3.right).magnitude;
         float unitsY = parent.TransformVector(liquid.localRotation * Vector3.up).magnitude;
-        liquid.localScale = new Vector3(interior.size.x / (sprite.size.x * unitsX), height / (sprite.size.y * unitsY), 1f);
-        liquid.position = new Vector3(interior.center.x, sourceArea.Bottom + height * 0.5f, interior.center.z);
+        liquid.localScale = new Vector3(width / (sprite.size.x * unitsX), height / (sprite.size.y * unitsY), 1f);
+        float centerOffset = surface - height * 0.5f - Vector3.Dot(interior.center, surfaceUp);
+        liquid.position = interior.center + surfaceUp * centerOffset;
 
-        if (sourceFlow != null && sourceFlow.enabled)
-            DrawSourceFlow(surface);
+        if (returnFlow != null)
+            returnFlow.enabled = settleProgress < 1f && DrawReturnFlow(maskToWorld, surfaceUp, surface);
     }
 
-    private void DrawSourceFlow(float surface)
+    private bool DrawReturnFlow(Matrix4x4 maskToWorld, Vector3 surfaceUp, float surface)
     {
-        int start = 0;
-        for (int i = 0; i < sourceFlowPath.Length; i++)
+        // Pull the top of the remaining sheet down the inside wall as it drains into the pool.
+        float retreat = Mathf.InverseLerp(0.16f, 0.88f, settleProgress);
+        float pathIndex = (sourceFlowPath.Length - 1) * (1f - retreat * retreat);
+        int next = Mathf.CeilToInt(pathIndex) - 1;
+        if (next < 0)
+            return false;
+
+        Vector2 tip = Vector2.Lerp(sourceFlowPath[next], sourceFlowPath[next + 1], pathIndex - next);
+        Vector3 point = maskToWorld.MultiplyPoint3x4(tip);
+        float aboveSurface = Vector3.Dot(point, surfaceUp) - surface;
+        if (aboveSurface <= 0f)
+            return false;
+
+        float exposedHeight = aboveSurface;
+        returnFlowPoints[0] = point;
+        int count = 1;
+        for (int i = next; i >= 0; i--)
         {
-            sourceFlowPoints[i] = sourceMask.transform.TransformPoint(sourceFlowPath[i]);
-            if (sourceFlowPoints[i].y < sourceFlowPoints[start].y)
-                start = i;
+            Vector3 lower = maskToWorld.MultiplyPoint3x4(sourceFlowPath[i]);
+            float lowerHeight = Vector3.Dot(lower, surfaceUp) - surface;
+            if (lowerHeight <= 0f)
+            {
+                // Extend a little into the liquid so the ribbon meets the pool without a seam.
+                float overlap = Mathf.Min(0.04f, -lowerHeight);
+                returnFlowPoints[count++] = Vector3.Lerp(point, lower, (aboveSurface + overlap) / (aboveSurface - lowerHeight));
+                returnFlow.positionCount = count;
+                for (int vertex = 0; vertex < count; vertex++)
+                    returnFlow.SetPosition(vertex, returnFlowPoints[vertex]);
+                returnFlow.widthMultiplier = streamWidth * 0.82f * Mathf.InverseLerp(0f, 0.2f, exposedHeight);
+                return true;
+            }
+
+            returnFlowPoints[count++] = lower;
+            point = lower;
+            aboveSurface = lowerHeight;
         }
-        sourceFlowPoints[sourceFlowPath.Length] = stream.GetPosition(0);
 
-        // Start inside the pool, then follow the curved neck to the outgoing stream.
-        while (start + 1 < sourceFlowPath.Length && sourceFlowPoints[start + 1].y <= surface - 0.04f)
-            start++;
-
-        sourceFlow.positionCount = sourceFlowPoints.Length - start;
-        for (int i = start; i < sourceFlowPoints.Length; i++)
-            sourceFlow.SetPosition(i - start, sourceFlowPoints[i]);
-        sourceFlow.widthMultiplier = streamWidth * 0.86f * sourceFlowStrength;
+        return false;
     }
 
     private void ClearPourEffects()
     {
         stream.enabled = false;
-        sourceFlowStrength = 0f;
-        if (sourceFlow != null)
-            sourceFlow.enabled = false;
+        settleProgress = 1f;
+        if (returnFlow != null)
+            returnFlow.enabled = false;
         splash.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        if (completionParticles != null)
+            completionParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
     }
 
     private Tween MoveTo(Vector3 position, Quaternion rotation, float duration)
