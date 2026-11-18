@@ -68,6 +68,7 @@ public sealed class DragToPour2D : MonoBehaviour
     private float idleSloshTime;
     private float idleSurfaceAngle;
     private ParticleSystem completionParticles;
+    private bool pouredNotified;
 
     private void Awake()
     {
@@ -130,6 +131,7 @@ public sealed class DragToPour2D : MonoBehaviour
     private void OnEnable()
     {
         phase = Phase.Entering;
+        pouredNotified = false;
         view = Camera.main;
         if (jugExit != null)
             jugExit.enabled = false;
@@ -272,7 +274,7 @@ public sealed class DragToPour2D : MonoBehaviour
             yield return null;
         }
         sourceRemainingArea = sourceStartArea * sourceRemainingFraction;
-        float fullSurface = SetFill(1f);
+        SetFill(1f);
         stream.enabled = false;
         splash.Stop(true, ParticleSystemStopBehavior.StopEmitting);
 
@@ -283,10 +285,16 @@ public sealed class DragToPour2D : MonoBehaviour
         if (jugExit != null)
             jugExit.enabled = true;
 
-        yield return PlayGlassCompletion(glass, fullSurface);
-        while (jugExit != null && jugExit.enabled)
-            yield return null;
-        poured?.Invoke();
+        if (jugExit == null)
+            NotifyPoured();
+    }
+
+    // Run by the decoration controller after all three garnishes have landed.
+    public IEnumerator PlayFinalGlassCompletion()
+    {
+        Bounds liquid = receiverLiquid.bounds;
+        float surface = liquid.max.y - liquid.size.y * ReceiverSurfaceDepth;
+        yield return PlayGlassCompletion(receiver.bounds, surface);
     }
 
     private IEnumerator PlayGlassCompletion(Bounds glassBounds, float surface)
@@ -429,8 +437,14 @@ public sealed class DragToPour2D : MonoBehaviour
     private void OnJugExited()
     {
         jugExit.enabled = false;
-        if (!gameObject.activeInHierarchy)
-            poured?.Invoke();
+        NotifyPoured();
+    }
+
+    private void NotifyPoured()
+    {
+        if (pouredNotified) return;
+        pouredNotified = true;
+        poured?.Invoke();
     }
 
     private void DrawStream(float surface, float tail, float head, float strength)

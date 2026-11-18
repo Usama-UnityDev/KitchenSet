@@ -111,18 +111,42 @@ public class CakeFinalPresentation : MonoBehaviour
         sprinkleMaterial = null;
     }
 
+    // Juice shares the cake chef, two-hand IK, offering gesture and completion photograph.
+    public IEnumerator PrepareAndPresentDrink(Transform glass, SlideOutObject exit)
+    {
+        if (exit == null) throw new System.InvalidOperationException("Assign the juice glass SlideOutObject.");
+        bool exited = false;
+        System.Action completed = () => exited = true;
+        exit.direction = SlideOutObject.ExitDirection.Right;
+        exit.Completed += completed;
+        try
+        {
+            exit.enabled = true;
+            while (!exited) yield return null;
+        }
+        finally { if (exit != null) exit.Completed -= completed; }
+        BuildServedItem(glass, true);
+        presenting = true;
+        yield return ArriveAndPhotograph();
+    }
+
     private void BuildPlatedCake(Transform source)
+    {
+        BuildServedItem(source, false);
+    }
+
+    private void BuildServedItem(Transform source, bool drink)
     {
         Camera camera = Camera.main;
         display = new GameObject("Chef carrying the player's cake").transform;
         servingRig = new GameObject("Held plate and decorated cake").transform;
         servingRig.SetParent(display, false);
-        Transform cake = Instantiate(source, servingRig, false);
-        cake.name = "Player decorated cake";
+        Transform cake = drink ? CopyDrinkVisuals(source, servingRig) : Instantiate(source, servingRig, false);
+        cake.name = drink ? "Player decorated juice glass" : "Player decorated cake";
         cake.gameObject.SetActive(true);
         foreach (Animator animator in cake.GetComponentsInChildren<Animator>(true)) animator.enabled = false;
         foreach (Collider2D collider in cake.GetComponentsInChildren<Collider2D>(true)) collider.enabled = false;
-        SpriteRenderer[] originals = source.GetComponentsInChildren<SpriteRenderer>(true);
+        SpriteRenderer[] originals = drink ? cake.GetComponentsInChildren<SpriteRenderer>(true) : source.GetComponentsInChildren<SpriteRenderer>(true);
         SpriteRenderer[] copies = cake.GetComponentsInChildren<SpriteRenderer>(true);
         for (int i = 0; i < originals.Length; i++)
         {
@@ -170,32 +194,45 @@ public class CakeFinalPresentation : MonoBehaviour
         chefBounds.SetMinMax(new Vector3(fullChef.min.x, waist, fullChef.min.z), fullChef.max);
 
         Bounds cakeBounds = CombinedBounds(cake);
-        float fit = Mathf.Min(chefHeight * 0.34f / cakeBounds.size.y, chefBounds.size.x * 0.86f / cakeBounds.size.x);
+        float fit = Mathf.Min(chefHeight * (drink ? 0.45f : 0.34f) / cakeBounds.size.y, chefBounds.size.x * (drink ? 0.52f : 0.86f) / cakeBounds.size.x);
         cake.localScale *= fit;
         cakeBounds = CombinedBounds(cake);
 
-        Transform plateTransform = new GameObject("Serving plate held by both hands").transform;
-        plateTransform.SetParent(servingRig, false);
-        SpriteRenderer plate = plateTransform.gameObject.AddComponent<SpriteRenderer>();
-        plate.sprite = servingPlate.sprite;
-        var plateMaterial = new Material(presentationSpriteShader);
-        plate.sharedMaterial = plateMaterial;
-        chefMaterials.Add(plateMaterial);
-        plate.sortingLayerID = servingPlate.sortingLayerID;
-        plate.sortingOrder = 99;
-        Bounds plateBounds = CakeToolScreenBounds.VisibleBounds(plate);
-        float plateScale = cakeBounds.size.x * 1.18f / plateBounds.size.x;
-        // The original plate artwork is almost circular; the serving view needs an ellipse.
-        plateTransform.localScale = new Vector3(plateScale, plateScale * 0.48f, plateScale);
-        plateBounds = CakeToolScreenBounds.VisibleBounds(plate);
         Vector3 grip = new Vector3(chefBounds.center.x, chefBounds.min.y + chefHeight * 0.24f, chef.position.z - 0.3f);
-        plateTransform.position += grip - plateBounds.center;
-        plateBounds = CakeToolScreenBounds.VisibleBounds(plate);
-        // The cake's bottom ellipse overlaps the inner plate, leaving just the rim visible.
-        Vector3 cakeBase = new Vector3(cakeBounds.center.x, cakeBounds.min.y, cakeBounds.center.z);
-        Vector3 landing = new Vector3(plateBounds.center.x, plateBounds.center.y - plateBounds.size.y * 0.18f, grip.z - 0.02f);
-        cake.position += landing - cakeBase;
-        chefRig.Initialize(plateTransform, plate);
+        if (drink)
+        {
+            SpriteRenderer glassBody = null;
+            foreach (SpriteRenderer visual in copies)
+                if (visual.name == "front") { glassBody = visual; break; }
+            if (glassBody == null) throw new System.InvalidOperationException("The juice glass needs its front sprite for the two-hand grip.");
+            Bounds body = CakeToolScreenBounds.VisibleBounds(glassBody);
+            cake.position += grip - new Vector3(body.center.x, body.min.y + body.size.y * 0.3f, body.center.z);
+            chefRig.Initialize(cake, glassBody);
+        }
+        else
+        {
+            Transform plateTransform = new GameObject("Serving plate held by both hands").transform;
+            plateTransform.SetParent(servingRig, false);
+            SpriteRenderer plate = plateTransform.gameObject.AddComponent<SpriteRenderer>();
+            plate.sprite = servingPlate.sprite;
+            var plateMaterial = new Material(presentationSpriteShader);
+            plate.sharedMaterial = plateMaterial;
+            chefMaterials.Add(plateMaterial);
+            plate.sortingLayerID = servingPlate.sortingLayerID;
+            plate.sortingOrder = 99;
+            Bounds plateBounds = CakeToolScreenBounds.VisibleBounds(plate);
+            float plateScale = cakeBounds.size.x * 1.18f / plateBounds.size.x;
+            // The original plate artwork is almost circular; the serving view needs an ellipse.
+            plateTransform.localScale = new Vector3(plateScale, plateScale * 0.48f, plateScale);
+            plateBounds = CakeToolScreenBounds.VisibleBounds(plate);
+            plateTransform.position += grip - plateBounds.center;
+            plateBounds = CakeToolScreenBounds.VisibleBounds(plate);
+            // The cake's bottom ellipse overlaps the inner plate, leaving just the rim visible.
+            Vector3 cakeBase = new Vector3(cakeBounds.center.x, cakeBounds.min.y, cakeBounds.center.z);
+            Vector3 landing = new Vector3(plateBounds.center.x, plateBounds.center.y - plateBounds.size.y * 0.18f, grip.z - 0.02f);
+            cake.position += landing - cakeBase;
+            chefRig.Initialize(plateTransform, plate);
+        }
 
         displayBounds = CombinedBounds(display);
         float frameFit = Mathf.Min(camera.orthographicSize * 1.65f / displayBounds.size.y,
@@ -207,6 +244,33 @@ public class CakeFinalPresentation : MonoBehaviour
         display.position += center - displayBounds.center;
         display.SetParent(transform, true);
         displayBounds = CombinedBounds(display);
+    }
+
+    private static Transform CopyDrinkVisuals(Transform source, Transform parent)
+    {
+        // Copy only visible artwork: entrance scripts, colliders and particles must not restart.
+        Transform copy = new GameObject("Decorated drink artwork").transform;
+        copy.SetParent(parent, false);
+        foreach (SpriteRenderer original in source.GetComponentsInChildren<SpriteRenderer>(true))
+        {
+            bool visible = original.enabled;
+            for (Transform node = original.transform; node != source && node != null; node = node.parent)
+                visible &= node.gameObject.activeSelf;
+            if (!visible || original.sprite == null || original.name == "base shadow") continue;
+            Transform art = new GameObject(original.name).transform;
+            art.SetParent(copy, false);
+            art.localPosition = source.InverseTransformPoint(original.transform.position);
+            art.localRotation = Quaternion.Inverse(source.rotation) * original.transform.rotation;
+            Vector3 size = original.transform.lossyScale, rootSize = source.lossyScale;
+            art.localScale = new Vector3(size.x / rootSize.x, size.y / rootSize.y, size.z / rootSize.z);
+            SpriteRenderer sprite = art.gameObject.AddComponent<SpriteRenderer>();
+            sprite.sprite = original.sprite;
+            sprite.color = original.color;
+            sprite.flipX = original.flipX;
+            sprite.flipY = original.flipY;
+            sprite.sortingOrder = original.sortingOrder;
+        }
+        return copy;
     }
 
     private void OnEnable()

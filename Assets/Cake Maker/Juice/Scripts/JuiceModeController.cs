@@ -22,6 +22,9 @@ public sealed class JuiceModeController : MonoBehaviour
     [Header("Final Recipe")]
     [SerializeField] private GameObject toppingSelectionPanel;
     [SerializeField] private GameObject winPanel;
+    [SerializeField] private JuiceDecorationController finalDecoration;
+    [SerializeField] private CakeFinalPresentation finalPresentation;
+    [SerializeField] private SlideOutObject finalGlassExit;
     [SerializeField] private UnityEvent<int> toppingSelected;
 
     [Serializable]
@@ -51,6 +54,7 @@ public sealed class JuiceModeController : MonoBehaviour
         recipeIndex = -1;
         Hide(toppingSelectionPanel);
         Hide(winPanel);
+        if (finalDecoration != null) finalDecoration.ResetDecoration();
         foreach (GameObject recipe in recipes)
             Hide(recipe);
 
@@ -188,6 +192,11 @@ public sealed class JuiceModeController : MonoBehaviour
             return;
 
         phase = Phase.Toppings;
+        if (finalDecoration != null)
+        {
+            finalDecoration.BeginDecoration();
+            return;
+        }
         if (toppingSelectionPanel != null)
             toppingSelectionPanel.SetActive(true);
         else
@@ -202,12 +211,24 @@ public sealed class JuiceModeController : MonoBehaviour
 
     public void ConfirmToppings()
     {
-        if (phase != Phase.Toppings)
+        if (phase != Phase.Toppings || (finalDecoration != null && !finalDecoration.IsComplete))
             return;
 
         Hide(toppingSelectionPanel);
+        if (finalDecoration != null && finalPresentation != null)
+        {
+            phase = Phase.Exiting;
+            StartCoroutine(PresentFinalDrink());
+            return;
+        }
         phase = Phase.Playing;
         CompleteRecipe(recipes[recipeIndex]);
+    }
+
+    private IEnumerator PresentFinalDrink()
+    {
+        yield return finalPresentation.PrepareAndPresentDrink(finalDecoration.Glass, finalGlassExit);
+        phase = Phase.Won;
     }
 
     private void ActivateRecipe(int index)
