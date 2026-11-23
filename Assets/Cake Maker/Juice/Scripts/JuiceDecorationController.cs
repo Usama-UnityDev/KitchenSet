@@ -4,7 +4,7 @@ using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>Three independently selectable garnishes; completion requires an actual drop of each.</summary>
+/// <summary>Places the selected straw, lemon and umbrella at their authored glass positions.</summary>
 public sealed class JuiceDecorationController : MonoBehaviour
 {
     [Serializable]
@@ -14,7 +14,9 @@ public sealed class JuiceDecorationController : MonoBehaviour
         public Button button;
         public SpriteRenderer target;
         public Sprite[] options;
+        public SlideOutObject.ExitDirection entryDirection;
         [NonSerialized] public bool complete;
+        [NonSerialized] public Vector3 position;
         [NonSerialized] public Vector3 scale;
         [NonSerialized] public Sprite original;
     }
@@ -26,28 +28,29 @@ public sealed class JuiceDecorationController : MonoBehaviour
     [SerializeField] private RectTransform panelRoot, categoryPanel, optionPanel;
     [SerializeField] private Button[] optionButtons;
     [SerializeField] private Category[] categories;
-    [SerializeField] private DragToPour2D pour;
     [SerializeField] private Sprite handSprite;
     [SerializeField, Min(0.1f)] private float slideDuration = 0.55f;
     private Vector3 categoryHome, optionHome;
-    private JuiceDecorationItem item;
     private RectTransform hand;
+    private Coroutine optionGuide;
     private int current = -1;
     private bool ready, busy;
     public bool IsComplete { get; private set; }
     public Transform Glass => glass;
+    public SpriteRenderer GlassFront => glassFront;
 
     private void Awake()
     {
         categoryHome = categoryPanel.localPosition;
         optionHome = optionPanel.localPosition;
-        // Garnishes travel with the glass during the final pop, exit and serving gesture.
+        // Garnishes travel with the glass during the exit and serving gesture.
         decorationRoot.SetParent(glass, true);
         decorationRoot.gameObject.SetActive(true);
         for (int i = 0; i < categories.Length; i++)
         {
             int index = i;
             Category category = categories[i];
+            category.position = category.target.transform.localPosition;
             category.scale = category.target.transform.localScale;
             category.original = category.target.sprite;
             category.button.onClick.AddListener(() => SelectCategory(index));
@@ -62,8 +65,9 @@ public sealed class JuiceDecorationController : MonoBehaviour
             var guide = new GameObject("Juice decoration hand", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
             hand = guide.GetComponent<RectTransform>();
             hand.SetParent(panelRoot.parent, false);
-            hand.sizeDelta = new Vector2(80f, 80f);
-            hand.pivot = new Vector2(0.1f, 0.92f);
+            const float handWidth = 80f;
+            hand.sizeDelta = new Vector2(handWidth, handWidth * handSprite.rect.height / handSprite.rect.width);
+            hand.pivot = new Vector2(0.05f, 0.95f);
             Image image = guide.GetComponent<Image>();
             image.sprite = handSprite;
             image.preserveAspect = true;
@@ -79,13 +83,14 @@ public sealed class JuiceDecorationController : MonoBehaviour
         optionPanel.DOKill();
         categoryPanel.localPosition = categoryHome;
         optionPanel.localPosition = optionHome;
-        ClearItem();
         HideGuide();
         ready = busy = IsComplete = false;
         current = -1;
         foreach (Category category in categories)
         {
             category.complete = false;
+            category.target.transform.DOKill();
+            category.target.transform.localPosition = category.position;
             category.target.gameObject.SetActive(false);
             category.target.sprite = category.original;
             category.target.transform.localScale = category.scale;
@@ -108,14 +113,24 @@ public sealed class JuiceDecorationController : MonoBehaviour
         Canvas.ForceUpdateCanvases();
         Canvas canvas = panelRoot.GetComponentInParent<Canvas>();
         float offset = Screen.width / Mathf.Max(0.01f, canvas.scaleFactor) + optionPanel.rect.width + 250f;
-        categoryPanel.localPosition = categoryHome + Vector3.left * offset;
-        optionPanel.localPosition = optionHome + Vector3.left * offset;
+        categoryPanel.localPosition = categoryHome + Vector3.right * offset;
+        optionPanel.localPosition = optionHome + Vector3.right * offset;
         categoryPanel.DOLocalMove(categoryHome, slideDuration).SetEase(Ease.OutCubic);
         yield return optionPanel.DOLocalMove(optionHome, slideDuration).SetEase(Ease.OutCubic).WaitForCompletion();
         busy = false;
         ready = true;
         SetButtons(true);
-        Guide(categories[0].button.transform.position);
+        if (hand != null)
+        {
+            // The thin straw sits left of the artwork's center, just below its loop.
+            var strawIcon = (RectTransform)categories[0].button.transform.GetChild(0);
+            hand.position = strawIcon.TransformPoint(Rect.NormalizedToPoint(strawIcon.rect, new Vector2(0.27f, 0.63f)));
+            ShowGuide();
+            DOTween.Sequence().SetTarget(hand)
+                .Append(TapGuide())
+                .AppendInterval(0.55f)
+                .SetLoops(-1);
+        }
     }
 
     private void SetButtons(bool enabled)
@@ -129,7 +144,7 @@ public sealed class JuiceDecorationController : MonoBehaviour
     public void SelectCategory(int index)
     {
         if (!ready || busy || IsComplete || index < 0 || index >= categories.Length || categories[index].complete) return;
-        ClearItem();
+        bool guideWasVisible = hand != null && hand.gameObject.activeSelf;
         HideGuide();
         current = index;
         for (int i = 0; i < optionButtons.Length; i++)
@@ -140,7 +155,14 @@ public sealed class JuiceDecorationController : MonoBehaviour
             icon.preserveAspect = true;
         }
         SetButtons(true);
-        Guide(optionButtons[0].transform.position);
+        int optionCount = Mathf.Min(optionButtons.Length, categories[index].options.Length);
+        if (index == 0 && hand != null && optionCount > 0)
+        {
+            if (!guideWasVisible)
+                hand.position = ButtonCenter(optionButtons[0]);
+            ShowGuide();
+            optionGuide = StartCoroutine(GuideOptions(optionCount));
+        }
     }
 
     public void SelectOption(int index)
@@ -148,120 +170,108 @@ public sealed class JuiceDecorationController : MonoBehaviour
         if (!ready || busy || current < 0 || IsComplete || categories[current].complete) return;
         Category category = categories[current];
         if (index < 0 || index >= category.options.Length) return;
-        ClearItem();
+        busy = true;
+        SetButtons(false);
         HideGuide();
         Sprite sprite = category.options[index];
         category.target.sprite = sprite;
         float fit = category.original.bounds.size.y / Mathf.Max(0.01f, sprite.bounds.size.y);
         category.target.transform.localScale = category.scale * fit;
-        var tool = new GameObject("Drag " + category.name);
-        SpriteRenderer visual = tool.AddComponent<SpriteRenderer>();
-        visual.sprite = sprite;
-        visual.sortingLayerID = glassFront.sortingLayerID;
-        visual.sortingOrder = 50;
-        tool.transform.localScale = category.target.transform.lossyScale;
+        StartCoroutine(PlaceGarnish(category));
+    }
+
+    private IEnumerator PlaceGarnish(Category category)
+    {
+        Transform target = category.target.transform;
+        target.gameObject.SetActive(true);
         Camera camera = Camera.main;
-        tool.transform.position = camera.ViewportToWorldPoint(new Vector3(0.30f, 0.53f, camera.WorldToScreenPoint(glass.position).z));
-        tool.AddComponent<BoxCollider2D>();
-        item = tool.AddComponent<JuiceDecorationItem>();
-        item.Initialize(this, visual);
-        GuideItem();
-    }
+        Vector3 home = target.position;
+        Vector3 screen = camera.WorldToScreenPoint(home);
+        Bounds bounds = category.target.bounds;
+        Vector3 visualMin = camera.WorldToScreenPoint(bounds.min);
+        Vector3 visualMax = camera.WorldToScreenPoint(bounds.max);
+        const float padding = 12f;
+        switch (category.entryDirection)
+        {
+            case SlideOutObject.ExitDirection.Top:
+                screen.y += camera.pixelRect.yMax - visualMin.y + padding;
+                break;
+            case SlideOutObject.ExitDirection.Right:
+                screen.x += camera.pixelRect.xMax - visualMin.x + padding;
+                break;
+            case SlideOutObject.ExitDirection.Left:
+                screen.x += camera.pixelRect.xMin - visualMax.x - padding;
+                break;
+        }
 
-    public void SetDragging(bool dragging)
-    {
-        busy = dragging;
-        SetButtons(!dragging);
-        HideGuide();
-    }
-
-    public bool TryDrop(JuiceDecorationItem source, Vector3 point)
-    {
-        if (source != item || current < 0 || !ready || IsComplete || categories[current].complete) return false;
-        Bounds bounds = CakeToolScreenBounds.VisibleBounds(glassFront);
-        // Accept the glass bowl and rim, including the authored straw/umbrella landing points.
-        bounds.Encapsulate(categories[current].target.transform.position);
-        bounds.Expand(new Vector3(0.65f, 0.7f, 1f));
-        if (point.x < bounds.min.x || point.x > bounds.max.x || point.y < bounds.min.y || point.y > bounds.max.y) return false;
-        busy = true;
-        SetButtons(false);
-        StartCoroutine(LandItem(categories[current]));
-        return true;
-    }
-
-    private IEnumerator LandItem(Category category)
-    {
-        Transform drop = item.transform;
-        Vector3 start = drop.position, landing = category.target.transform.position;
-        drop.DOScale(category.target.transform.lossyScale, 0.42f);
-        yield return DOTween.To(() => 0f, t => drop.position = Vector3.Lerp(start, landing, t) + Vector3.up * Mathf.Sin(t * Mathf.PI) * 0.45f,
-            1f, 0.42f).SetEase(Ease.InOutSine).WaitForCompletion();
-        category.target.gameObject.SetActive(true);
+        target.position = camera.ScreenToWorldPoint(screen);
+        yield return target.DOLocalMove(category.position, slideDuration).SetEase(Ease.OutCubic).WaitForCompletion();
         category.complete = true;
-        ClearItem();
-        busy = false;
         current = -1;
-        SetButtons(true);
+        busy = false;
         foreach (Category remaining in categories)
         {
-            if (!remaining.complete) { Guide(remaining.button.transform.position); yield break; }
+            if (remaining.complete)
+                continue;
+
+            SetButtons(true);
+            yield break;
         }
+
         IsComplete = true;
         ready = false;
         SetButtons(false);
-        HideGuide();
         panelRoot.gameObject.SetActive(false);
-        // No glass pop or win transition is allowed before all three drops have settled.
-        yield return pour.PlayFinalGlassCompletion();
         mode.ConfirmToppings();
     }
 
-    public void GuideItem()
+    private IEnumerator GuideOptions(int optionCount)
     {
-        if (item == null || hand == null) return;
-        Canvas canvas = hand.GetComponentInParent<Canvas>();
-        Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-        RectTransform parent = (RectTransform)hand.parent;
-        RectTransformUtility.ScreenPointToWorldPointInRectangle(parent, Camera.main.WorldToScreenPoint(item.transform.position), uiCamera, out Vector3 start);
-        RectTransformUtility.ScreenPointToWorldPointInRectangle(parent, Camera.main.WorldToScreenPoint(glassFront.bounds.center), uiCamera, out Vector3 end);
-        Guide(start);
-        hand.DOKill();
-        DOTween.Sequence().SetTarget(hand).Append(hand.DOMove(end, 1f).SetEase(Ease.InOutSine))
-            .AppendInterval(0.25f).AppendCallback(() => hand.position = start).AppendInterval(0.2f).SetLoops(-1);
+        int index = 0;
+        while (true)
+        {
+            yield return hand.DOMove(ButtonCenter(optionButtons[index]), 0.28f)
+                .SetEase(Ease.InOutSine).WaitForCompletion();
+            yield return TapGuide().WaitForCompletion();
+            yield return new WaitForSeconds(0.32f);
+            index = (index + 1) % optionCount;
+        }
     }
 
-    private void Guide(Vector3 point)
+    private static Vector3 ButtonCenter(Button button)
     {
-        if (hand == null) return;
-        HideGuide();
-        hand.position = point;
+        var rect = (RectTransform)button.transform;
+        return rect.TransformPoint(rect.rect.center);
+    }
+
+    private Tween TapGuide() => hand.DOScale(0.86f, 0.14f).SetEase(Ease.InOutSine).SetLoops(2, LoopType.Yoyo);
+
+    private void ShowGuide()
+    {
         hand.localScale = Vector3.one;
         hand.gameObject.SetActive(true);
         hand.SetAsLastSibling();
-        hand.DOScale(0.88f, 0.5f).SetLoops(-1, LoopType.Yoyo);
     }
 
     private void HideGuide()
     {
+        if (optionGuide != null)
+        {
+            StopCoroutine(optionGuide);
+            optionGuide = null;
+        }
         if (hand == null) return;
         hand.DOKill();
         hand.gameObject.SetActive(false);
-    }
-
-    private void ClearItem()
-    {
-        if (item == null) return;
-        item.transform.DOKill();
-        Destroy(item.gameObject);
-        item = null;
     }
 
     private void OnDestroy()
     {
         categoryPanel.DOKill();
         optionPanel.DOKill();
-        ClearItem();
         HideGuide();
+        foreach (Category category in categories)
+            category.target.transform.DOKill();
         if (hand != null) Destroy(hand.gameObject);
     }
 }

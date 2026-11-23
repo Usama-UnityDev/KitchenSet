@@ -6,11 +6,12 @@ Shader "HUsama/PresentationSprite"
         _PaintTex ("Nozzle paint mask", 2D) = "black" {}
         _Complete ("Complete", Range(0,1)) = 1
         _LocalRect ("Sprite local bounds", Vector) = (0,0,1,1)
+        [Enum(UnityEngine.Rendering.CompareFunction)] _DepthTest ("Depth test", Float) = 8
     }
     SubShader
     {
         Tags { "Queue"="Transparent" "RenderType"="Transparent" "CanUseSpriteAtlas"="True" }
-        Cull Off ZWrite Off Lighting Off ZTest Always
+        Cull Off ZWrite Off Lighting Off ZTest [_DepthTest]
         Blend One OneMinusSrcAlpha
         Pass
         {

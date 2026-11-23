@@ -375,7 +375,7 @@ MonoBehaviour:
   m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 291f6b02a99f7394e9af639a9229b805, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SlideOutObject
   direction: 1
   duration: 0.65
@@ -3607,7 +3607,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 0.95, b: 0.98, a: 1}
@@ -5508,7 +5508,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Text
   m_Material: {fileID: 0}
   m_Color: {r: 0.45, g: 0.33, b: 0.5, a: 1}
@@ -5657,13 +5657,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 681256652}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1bfb7249f96841c19e9073e973dc7d51, type: 3}
-  m_Name:
-  m_EditorClassIdentifier: Assembly-CSharp::CakeFinalPresentation
-  servingPlate: {fileID: 451}
-  sprinkleSprites:
-  - {fileID: 21300000, guid: a39ba52bda2242c4b8610eaddffe1856, type: 3}
-  - {fileID: 21300000, guid: 1fea9c96db7c5664fa01f73bbb474bd1, type: 3}
+  m_Script: {fileID: 11500000, guid: c341594445694175bb183a0a2cc835cb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::JuiceFinalPresentation
   nextModeRequested:
     m_PersistentCalls:
       m_Calls: []
@@ -5671,12 +5667,12 @@ MonoBehaviour:
   chefModelShader: {fileID: 4800000, guid: c4cc354f1f1d448f835cdffab46f9111, type: 3}
   presentationSpriteShader: {fileID: 4800000, guid: c4cc354f1f1d448f835cdffab46f9222, type: 3}
   nextModeScene: Juice
-  showerDuration: 1.5
   winPanel: {fileID: 1330882873}
   winCard: {fileID: 13455125}
   winPhotograph: {fileID: 1223830143}
   winPhotoAspect: {fileID: 1223830140}
   nextModeButton: {fileID: 1674451477}
+  glassExitDelay: 0.35
 --- !u!114 &681256656
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5687,7 +5683,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ab9ae68b00af4d044a3219311abf7446, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::JuiceDecorationController
   mode: {fileID: 681256654}
   glass: {fileID: 252}
@@ -5708,6 +5704,7 @@ MonoBehaviour:
     - {fileID: 21300000, guid: 1e16ecd214d6a7447be59a8635edd44d, type: 2}
     - {fileID: 21300000, guid: 4bed112ce82911943b04d390d870ea2a, type: 3}
     - {fileID: 21300000, guid: cee8651b8d8af9441a03604c8a479565, type: 3}
+    entryDirection: 2
   - name: Lemon
     button: {fileID: 695432700}
     target: {fileID: 406593604}
@@ -5715,6 +5712,7 @@ MonoBehaviour:
     - {fileID: 21300000, guid: 1f8e4798009276c4eb4a85868a457c31, type: 3}
     - {fileID: 21300000, guid: 31ad93115637c774f9c44de8db2a2f3c, type: 3}
     - {fileID: 21300000, guid: 048b866bb7d7e804d863cfa637732a53, type: 3}
+    entryDirection: 1
   - name: Umb
     button: {fileID: 1017985705}
     target: {fileID: 359612950}
@@ -5722,7 +5720,7 @@ MonoBehaviour:
     - {fileID: 21300000, guid: 7dd0366e7bd2fd4429a3671903e0ac29, type: 3}
     - {fileID: 21300000, guid: c2bb37c9ee2ae9a48a5aa542e57a23df, type: 3}
     - {fileID: 21300000, guid: 5d825031b75c9854f9d687ca404c2918, type: 3}
-  pour: {fileID: 1646879580}
+    entryDirection: 0
   handSprite: {fileID: 21300000, guid: 154ec27406e46984c983da25664e5a30, type: 2}
   slideDuration: 0.55
 --- !u!1 &695432696
@@ -6180,7 +6178,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Text
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -6750,7 +6748,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Text
   m_Material: {fileID: 0}
   m_Color: {r: 0.37, g: 0.15, b: 0.48, a: 1}
@@ -7485,7 +7483,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1344c3c82d62a2a41a3576d8abb8e3ea, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RawImage
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -7530,7 +7528,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.CanvasScaler
   m_UiScaleMode: 1
   m_ReferencePixelsPerUnit: 100
@@ -7789,7 +7787,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.GraphicRaycaster
   m_IgnoreReversedGraphics: 1
   m_BlockingObjects: 0
@@ -7829,7 +7827,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 0.1, g: 0.035, b: 0.18, a: 0.78}
@@ -10904,7 +10902,6 @@ MonoBehaviour:
   spoutClearance: 1
   fillDuration: 2.45
   jugExit: {fileID: 1646879578}
-  completionParticleMaterial: {fileID: 2100000, guid: 4c90b7cad44ab2f4cb9fe784acd18c3a, type: 2}
   poured:
     m_PersistentCalls:
       m_Calls:
@@ -11060,7 +11057,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
   m_Navigation:
     m_Mode: 3
@@ -11095,15 +11092,15 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 681256655}
-        m_TargetAssemblyTypeName: CakeFinalPresentation, Assembly-CSharp
+        m_TargetAssemblyTypeName: JuiceFinalPresentation, Assembly-CSharp
         m_MethodName: NextMode
         m_Mode: 0
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName:
+          m_ObjectArgumentAssemblyTypeName: 
           m_IntArgument: 0
           m_FloatArgument: 0
-          m_StringArgument:
+          m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
 --- !u!114 &1674451478
@@ -11116,7 +11113,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 0.84, g: 0.2, b: 0.48, a: 1}
@@ -11401,7 +11398,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 0.9, g: 0.82, b: 0.97, a: 1}
@@ -11476,7 +11473,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -11914,7 +11911,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -14703,7 +14700,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}

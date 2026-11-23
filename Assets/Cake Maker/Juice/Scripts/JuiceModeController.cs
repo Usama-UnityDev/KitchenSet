@@ -23,7 +23,7 @@ public sealed class JuiceModeController : MonoBehaviour
     [SerializeField] private GameObject toppingSelectionPanel;
     [SerializeField] private GameObject winPanel;
     [SerializeField] private JuiceDecorationController finalDecoration;
-    [SerializeField] private CakeFinalPresentation finalPresentation;
+    [SerializeField] private JuiceFinalPresentation finalPresentation;
     [SerializeField] private SlideOutObject finalGlassExit;
     [SerializeField] private UnityEvent<int> toppingSelected;
 
@@ -41,6 +41,7 @@ public sealed class JuiceModeController : MonoBehaviour
     private bool previewing;
     private SlideOutObject exitAnimation;
     private Coroutine loadingTransition;
+    private Coroutine finalTransition;
 
     private void Start()
     {
@@ -51,12 +52,15 @@ public sealed class JuiceModeController : MonoBehaviour
     {
         ClearExitAnimation();
         ClearLoading();
+        ClearFinalTransition();
         recipeIndex = -1;
         Hide(toppingSelectionPanel);
         Hide(winPanel);
         if (finalDecoration != null) finalDecoration.ResetDecoration();
         foreach (GameObject recipe in recipes)
             Hide(recipe);
+        if (finalDecoration != null)
+            finalDecoration.Glass.gameObject.SetActive(true);
 
         previewing = false;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -101,6 +105,16 @@ public sealed class JuiceModeController : MonoBehaviour
     {
         ClearExitAnimation();
         ClearLoading();
+        ClearFinalTransition();
+    }
+
+    private void ClearFinalTransition()
+    {
+        if (finalTransition != null)
+            StopCoroutine(finalTransition);
+        finalTransition = null;
+        if (finalPresentation != null)
+            finalPresentation.ResetDrinkPresentation();
     }
 
     private void ClearExitAnimation()
@@ -218,7 +232,7 @@ public sealed class JuiceModeController : MonoBehaviour
         if (finalDecoration != null && finalPresentation != null)
         {
             phase = Phase.Exiting;
-            StartCoroutine(PresentFinalDrink());
+            finalTransition = StartCoroutine(PresentFinalDrink());
             return;
         }
         phase = Phase.Playing;
@@ -227,7 +241,8 @@ public sealed class JuiceModeController : MonoBehaviour
 
     private IEnumerator PresentFinalDrink()
     {
-        yield return finalPresentation.PrepareAndPresentDrink(finalDecoration.Glass, finalGlassExit);
+        yield return finalPresentation.PrepareAndPresentDrink(finalDecoration.Glass, finalDecoration.GlassFront, finalGlassExit);
+        finalTransition = null;
         phase = Phase.Won;
     }
 

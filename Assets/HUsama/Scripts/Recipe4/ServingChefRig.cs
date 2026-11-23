@@ -1,6 +1,6 @@
 using UnityEngine;
 
-/// <summary>Two-bone arm IK keeps both palms underneath the live serving plate.</summary>
+/// <summary>Two-bone arm IK keeps the chef's hands attached to the item being served.</summary>
 [DefaultExecutionOrder(100)]
 public class ServingChefRig : MonoBehaviour
 {
@@ -14,6 +14,7 @@ public class ServingChefRig : MonoBehaviour
     public float WaistWorldY => transform.TransformPoint(new Vector3(0f, WaistLocalY, 0f)).y;
     private Renderer[] visuals;
     private MaterialPropertyBlock crop;
+    private bool gripsGlass;
     public float Offer { get; set; }
 
     private sealed class Arm
@@ -21,12 +22,14 @@ public class ServingChefRig : MonoBehaviour
         public Transform upper, forearm, hand;
         public float upperLength, lowerLength;
         public Quaternion palmBasis;
+        public Vector3 palmCenter;
         public float side;
     }
 
-    public void Initialize(Transform servingPlate, SpriteRenderer visual)
+    public void Initialize(Transform servingPlate, SpriteRenderer visual, bool gripGlass = false)
     {
         plate = servingPlate;
+        gripsGlass = gripGlass;
         crop = new MaterialPropertyBlock();
         plateRenderer = visual;
         visuals = GetComponentsInChildren<Renderer>();
@@ -59,6 +62,7 @@ public class ServingChefRig : MonoBehaviour
         Vector3 normal = arm.hand.InverseTransformDirection(Vector3.Cross(thumb.position - arm.hand.position, little.position - arm.hand.position)).normalized;
         if (side == "R") normal = -normal;
         arm.palmBasis = Quaternion.LookRotation(forward, normal);
+        arm.palmCenter = arm.hand.InverseTransformPoint(Vector3.Lerp(arm.hand.position, middle.position, 0.75f));
         return arm;
     }
 
@@ -66,7 +70,8 @@ public class ServingChefRig : MonoBehaviour
     {
         if (plate == null || left == null || crop == null) return;
         Bounds bounds = CakeToolScreenBounds.VisibleBounds(plateRenderer);
-        Solve(left, bounds); Solve(right, bounds);
+        Solve(left, bounds, gripsGlass);
+        Solve(right, bounds, gripsGlass);
         if (head != null) head.localRotation = headRest * Quaternion.Euler(Offer * 5f, Mathf.Sin(Time.time * 1.7f) * 1.5f, 0f);
         float smile = (0.4f + Offer * 0.6f) * transform.TransformVector(Vector3.up).magnitude;
         if (leftSmile != null) leftSmile.localPosition = leftSmileRest + leftSmile.parent.InverseTransformVector(Vector3.up * (smile * 0.0065f));
@@ -75,9 +80,20 @@ public class ServingChefRig : MonoBehaviour
         foreach (Renderer visual in visuals) visual.SetPropertyBlock(crop);
     }
 
-    private static void Solve(Arm arm, Bounds bounds)
+    private static void Solve(Arm arm, Bounds bounds, bool gripGlass)
     {
         Vector3 target = new Vector3(bounds.center.x + arm.side * bounds.size.x * 0.39f, bounds.min.y + bounds.size.y * 0.30f, bounds.center.z + 0.06f);
+        Quaternion handRotation = Quaternion.LookRotation(Vector3.back, Vector3.up) * Quaternion.Inverse(arm.palmBasis);
+        if (gripGlass)
+        {
+            // The lower glass wall tapers inward. Align the palm with the wall and wrap the fingers toward the viewer.
+            Vector3 towardGlass = Vector3.left * arm.side;
+            Vector3 fingers = towardGlass * 0.55f + Vector3.up * 0.35f + Vector3.back * 0.75f;
+            handRotation = Quaternion.LookRotation(fingers, towardGlass) * Quaternion.Inverse(arm.palmBasis);
+            Vector3 contact = new Vector3(bounds.center.x + arm.side * bounds.size.x * 0.40f,
+                bounds.min.y + bounds.size.y * 0.24f, bounds.center.z + 0.025f);
+            target = contact - handRotation * Vector3.Scale(arm.palmCenter, arm.hand.lossyScale);
+        }
         Vector3 root = arm.upper.position;
         arm.upperLength = Vector3.Distance(arm.upper.position, arm.forearm.position);
         arm.lowerLength = Vector3.Distance(arm.forearm.position, arm.hand.position);
@@ -92,6 +108,6 @@ public class ServingChefRig : MonoBehaviour
         Vector3 elbow = root + direction * along + bend * height;
         arm.upper.rotation = Quaternion.FromToRotation(arm.forearm.position - root, elbow - root) * arm.upper.rotation;
         arm.forearm.rotation = Quaternion.FromToRotation(arm.hand.position - arm.forearm.position, target - arm.forearm.position) * arm.forearm.rotation;
-        arm.hand.rotation = Quaternion.LookRotation(Vector3.back, Vector3.up) * Quaternion.Inverse(arm.palmBasis);
+        arm.hand.rotation = handRotation;
     }
 }

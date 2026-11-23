@@ -28,7 +28,6 @@ public sealed class DragToPour2D : MonoBehaviour
     [SerializeField, Min(0.1f)] private float spoutClearance = 1f;
     [SerializeField, Min(0.1f)] private float fillDuration = 1.65f;
     [SerializeField] private SlideOutObject jugExit;
-    [SerializeField] private Material completionParticleMaterial;
     [SerializeField] private UnityEvent poured;
 
     private const float NeckLiquidDepth = 0.22f;
@@ -44,7 +43,6 @@ public sealed class DragToPour2D : MonoBehaviour
     private Collider2D pickup;
     private SpriteEnterAnimation entrance;
     private Tween motion;
-    private Tween glassMotion;
     private Vector3 authoredPosition;
     private Vector3 home;
     private Quaternion restRotation;
@@ -67,7 +65,6 @@ public sealed class DragToPour2D : MonoBehaviour
     private float settleProgress = 1f;
     private float idleSloshTime;
     private float idleSurfaceAngle;
-    private ParticleSystem completionParticles;
     private bool pouredNotified;
 
     private void Awake()
@@ -123,9 +120,6 @@ public sealed class DragToPour2D : MonoBehaviour
 
         if (jugExit != null)
             jugExit.Completed += OnJugExited;
-
-        if (completionParticleMaterial != null)
-            CreateCompletionParticles();
     }
 
     private void OnEnable()
@@ -165,8 +159,6 @@ public sealed class DragToPour2D : MonoBehaviour
         StopAllCoroutines();
         motion?.Kill();
         motion = null;
-        glassMotion?.Kill();
-        glassMotion = null;
         ClearPourEffects();
         if (jugExit != null)
             jugExit.enabled = false;
@@ -176,8 +168,6 @@ public sealed class DragToPour2D : MonoBehaviour
     {
         if (jugExit != null)
             jugExit.Completed -= OnJugExited;
-        if (completionParticles != null)
-            Destroy(completionParticles.gameObject);
     }
 
     private void Update()
@@ -287,100 +277,6 @@ public sealed class DragToPour2D : MonoBehaviour
 
         if (jugExit == null)
             NotifyPoured();
-    }
-
-    // Run by the decoration controller after all three garnishes have landed.
-    public IEnumerator PlayFinalGlassCompletion()
-    {
-        Bounds liquid = receiverLiquid.bounds;
-        float surface = liquid.max.y - liquid.size.y * ReceiverSurfaceDepth;
-        yield return PlayGlassCompletion(receiver.bounds, surface);
-    }
-
-    private IEnumerator PlayGlassCompletion(Bounds glassBounds, float surface)
-    {
-        Transform glass = receiver.transform;
-        Vector3 restPosition = glass.localPosition;
-        Vector3 restGlassScale = glass.localScale;
-        float raisedY = glass.position.y + glassBounds.size.y * 0.11f;
-
-        if (completionParticles != null)
-        {
-            completionParticles.transform.position = new Vector3(glassBounds.center.x, surface + 0.14f, glassBounds.center.z);
-        }
-
-        glassMotion = DOTween.Sequence()
-            .AppendInterval(0.32f)
-            .AppendCallback(() => completionParticles?.Play())
-            .Append(glass.DOMoveY(raisedY, 0.18f).SetEase(Ease.OutCubic))
-            .Join(glass.DOScale(restGlassScale * 1.12f, 0.18f).SetEase(Ease.OutCubic))
-            .AppendInterval(0.22f)
-            .Append(glass.DOLocalMove(restPosition, 0.36f).SetEase(Ease.InOutSine))
-            .Join(glass.DOScale(restGlassScale, 0.36f).SetEase(Ease.InOutSine))
-            .OnKill(() =>
-            {
-                if (glass == null)
-                    return;
-                glass.localPosition = restPosition;
-                glass.localScale = restGlassScale;
-            });
-
-        yield return glassMotion.WaitForCompletion();
-        glassMotion = null;
-        while (completionParticles != null && completionParticles.IsAlive())
-            yield return null;
-    }
-
-    private void CreateCompletionParticles()
-    {
-        GameObject effect = new GameObject("CompletionParticles");
-        effect.SetActive(false);
-        effect.transform.SetParent(receiver.transform, false);
-
-        completionParticles = effect.AddComponent<ParticleSystem>();
-        var main = completionParticles.main;
-        main.duration = 0.7f;
-        main.loop = false;
-        main.playOnAwake = false;
-        main.cullingMode = ParticleSystemCullingMode.AlwaysSimulate;
-        main.simulationSpace = ParticleSystemSimulationSpace.World;
-        main.startLifetime = new ParticleSystem.MinMaxCurve(0.8f, 1.15f);
-        main.startSpeed = new ParticleSystem.MinMaxCurve(1.1f, 2.1f);
-        main.startSize = new ParticleSystem.MinMaxCurve(0.35f, 0.7f);
-        main.startRotation = new ParticleSystem.MinMaxCurve(-Mathf.PI, Mathf.PI);
-        main.gravityModifier = 0.12f;
-
-        var emission = completionParticles.emission;
-        emission.rateOverTime = 0f;
-        emission.SetBursts(new[]
-        {
-            new ParticleSystem.Burst(0.08f, 8),
-            new ParticleSystem.Burst(0.28f, 5),
-            new ParticleSystem.Burst(0.52f, 3)
-        });
-        var shape = completionParticles.shape;
-        shape.shapeType = ParticleSystemShapeType.Cone;
-        shape.rotation = new Vector3(-90f, 0f, 0f);
-        shape.angle = 55f;
-        shape.radius = 0.65f;
-        var size = completionParticles.sizeOverLifetime;
-        size.enabled = true;
-        size.size = new ParticleSystem.MinMaxCurve(1f,
-            new AnimationCurve(new Keyframe(0f, 0.55f), new Keyframe(0.22f, 1f), new Keyframe(1f, 0.5f)));
-
-        var color = completionParticles.colorOverLifetime;
-        color.enabled = true;
-        var fade = new Gradient();
-        fade.SetKeys(
-            new[] { new GradientColorKey(new Color(1f, 0.86f, 0.59f), 0f), new GradientColorKey(Color.white, 1f) },
-            new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.16f), new GradientAlphaKey(0f, 1f) });
-        color.color = fade;
-
-        var effectRenderer = effect.GetComponent<ParticleSystemRenderer>();
-        effectRenderer.sharedMaterial = completionParticleMaterial;
-        effectRenderer.sortingLayerID = receiverLiquid.sortingLayerID;
-        effectRenderer.sortingOrder = receiverLiquid.sortingOrder + 12;
-        effect.SetActive(true);
     }
 
     private IEnumerator SettleJug()
@@ -591,8 +487,6 @@ public sealed class DragToPour2D : MonoBehaviour
         if (returnFlow != null)
             returnFlow.enabled = false;
         splash.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-        if (completionParticles != null)
-            completionParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
     }
 
     private Tween MoveTo(Vector3 position, Quaternion rotation, float duration)
